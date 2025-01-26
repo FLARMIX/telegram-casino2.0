@@ -1,5 +1,6 @@
 from json import load
 from random import randint as ri
+from random import choice
 import os
 
 
@@ -12,6 +13,13 @@ class Scripts:
 
         self.admin_name = "@FLARMIX"
         self.channel_name = "@PidorsCasino"
+
+    def randomize_emoji(self, win: bool) -> str:
+        if win:
+            return choice('🥵😝😎🏆🔥')
+        else:
+            return choice('😢😭🥶😱😨😰😥😓')
+
 
     def unformat_number(self, formated_number: str) -> int:
         number: str = formated_number.replace(',', '')
@@ -41,6 +49,12 @@ class Scripts:
     def random_number(self) -> str:
         return str(ri(0, 36))
 
+    def pic_color(self, number: str) -> str:
+        if number in self.number_color:
+            return self.number_color[number]
+        else:
+            raise ValueError("Invalid number color: %s not in range(0, 36 + 1)" % number)
+
     def roulette_randomizer(self, stack: str):
         if stack in ['красное', 'черное', 'чёрное', 'зеро']:
             if stack == 'чёрное':
@@ -53,27 +67,3 @@ class Scripts:
         elif stack in ['нечёт', 'нечет']:
             number = self.random_number()
             return int(number) % 2 != 0, number
-
-
-
-
-if __name__ == '__main__':
-    cnt_zero = 0
-    cnt_even = 0
-    cnt_odd = 0
-    all_cnt = 0
-    scripts = Scripts()
-    for i in range(10000000):
-        test_even = scripts.roulette_randomizer("чет")
-
-        all_cnt += 1
-        if test_even:
-            cnt_even += 1
-        else:
-            cnt_odd += 1
-
-    print((cnt_zero/all_cnt) * 100)
-    print((cnt_even/all_cnt) * 100)
-    print((cnt_odd/all_cnt) * 100)
-
-

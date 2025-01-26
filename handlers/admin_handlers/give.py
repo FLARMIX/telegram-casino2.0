@@ -21,10 +21,12 @@ async def balance_command(message: Message):
             balance_type = "balance_alt"
             msg = ' "Word Of Alternative Balance"'
         else:
-            await message.answer("Используйте /give m для основного баланса или /give a для альтернативного.")
+            await message.answer("Используйте /give m для основного баланса или /give a для альтернативного.",
+                                 reply_to_message_id=message.message_id)
             return
 
         if target_user_id:
             current_balance = db.get_user_stat(target_user_id, balance_type)
             db.update_user(balance_type, current_balance + int(amount), target_user_id)
-            await message.answer(f"Выдано {scr.amount_changer(str(amount))}{msg} пользователю {target_username}")
+            await message.answer(f"Выдано {scr.amount_changer(str(amount))}{msg} пользователю {target_username}",
+                                 reply_to_message_id=message.message_id)
