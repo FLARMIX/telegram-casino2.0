@@ -33,8 +33,14 @@ async def roulette(message: Message):
 
         int_amount = scr.unformat_number(scr.amount_changer(amount))
 
+        if int_amount <= 0:
+            await message.answer("Сумма ставки должна быть больше 0!",
+                                 reply_to_message_id=message.message_id)
+            return
+
         if balance_main < int_amount:
-            await message.answer("У вас недостаточно средств!")
+            await message.answer(f"У вас недостаточно средств!\nВаш баланс {scr.amount_changer(balance_main)}",
+                                 reply_to_message_id=message.message_id)
             return
 
         db.update_user("balance_main", balance_main - int_amount, user_id)

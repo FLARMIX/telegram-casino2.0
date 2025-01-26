@@ -12,9 +12,13 @@ async def me(message: Message):
     db = Database()
     scr = Scripts()
     user_id = message.from_user.id
+    username = message.from_user.username
     if not db.get_user_by_tgid(user_id):
         await message.answer('Вы не зарегистрированы, пожалуйста, зарегистрируйтесь с помощью /register')
         return
+
+    if not db.get_user_stat(user_id, 'tgusername')[1:] == username:
+        db.update_user('tgusername', '@' + username, user_id)
 
     tg_username = db.get_user_stat(user_id, "tgusername")[1:]
     username = db.get_user_stat(user_id, "username")
