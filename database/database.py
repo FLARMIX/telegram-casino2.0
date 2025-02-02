@@ -64,7 +64,7 @@ class Database:
                             (username, tgusername, tguserid))
 
         self.cursor.execute("INSERT INTO UserItems (items_list, avatar_item, tguserid) VALUES (?, ?, ?)",
-                            ('{}', 'chervi', tguserid))
+                            ('{}', 'черви', tguserid))
 
         if str(tguserid) in ADMIN_IDs:
             self.make_admin(tguserid)
@@ -95,10 +95,20 @@ class Database:
                 return {}  # Возвращаем пустой словарь, если JSON некорректен
         return {}  # Возвращаем пустой словарь, если предметов нет
 
-    def get_item_path(self, item: str) -> str:
-        self.cursor.execute("SELECT item_path FROM Items WHERE item_name = ?", (item,))
+    def get_item_path(self, item_name: str) -> str:
+        self.cursor.execute("SELECT item_path FROM Items WHERE item_name = ?", (item_name,))
         result = self.cursor.fetchone()
         return result[0] if result else None
+
+    def get_item_type(self, item_name: str) -> str:
+        self.cursor.execute("SELECT item_type FROM Items WHERE item_name =?", (item_name,))
+        result = self.cursor.fetchone()
+        return result[0] if result else None
+
+    def get_user_avatar(self, tguserid: int) -> str:
+        self.cursor.execute("SELECT avatar_item FROM UserItems WHERE tguserid =?", (tguserid,))
+        result = self.cursor.fetchone()
+        return result[0] if result else 'chervi'  # Возвращаем аватарку по умолчанию
 
     def update_user(self, stat_name: str, value: Any, tguserid: int):
         self.cursor.execute("UPDATE Users SET {} =? WHERE tguserid =?".format(stat_name), (value, tguserid))
@@ -120,11 +130,11 @@ class Database:
                             (current_time, tguserid))
         self.save()
 
-    def add_item(self, name: str, item_type: str, path: str = None,
+    def add_item(self, item_name: str, item_type: str, path: str = None,
                  item_buy_price: int = None, item_sell_price: int = None):
         self.cursor.execute("INSERT INTO Items (item_name, item_path, item_type, item_buy_price, item_sell_price) "
                             "VALUES (?,?,?,?,?)",
-                            (name, path, item_type, item_buy_price, item_sell_price))
+                            (item_name, path, item_type, item_buy_price, item_sell_price))
         self.save()
 
     def get_existing_items_names(self) -> list:
