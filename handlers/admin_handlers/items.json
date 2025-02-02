@@ -1,0 +1,5 @@
+{
+  "черви": {"type":  "avatar", "path":  "items/chervi.jpg", "buy_price": "None", "sell_price": "None"},
+  "черви донатера": {"type": "avatar", "path": "items/chervi_donater.jpg", "buy_price": "None", "sell_price": 1500000000},
+  "1-й бета тест": {"type": "avatar", "path": "items/chervi_tester.jpg", "buy_price": "None", "sell_price": 10000000000}
+}

@@ -18,8 +18,8 @@ async def nickname(message: Message):
     else:
         username = ' '.join(message.text.split()[1:])
 
-    if len(username) > 15:
-        await message.answer("Имя не может быть длиннее 15 символов!")
+    if len(username) > 20:
+        await message.answer("Имя не может быть длиннее 20 символов!")
         return
 
     db.update_user("username", username, user_id)

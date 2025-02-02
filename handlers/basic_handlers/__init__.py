@@ -5,3 +5,4 @@ from . import bonus
 from . import player_info
 from . import pay
 from . import change_name
+from . import items

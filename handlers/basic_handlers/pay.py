@@ -27,6 +27,11 @@ async def pay(message: Message):
         int_amount = balance_main
     int_amount = scr.unformat_number(scr.amount_changer(amount))
 
+    if int_amount <= 0:
+        await message.answer('Сумма перевода должна быть больше 0!',
+                             reply_to_message_id=message.message_id)
+        return
+
     try:
         target_id = db.get_user_id_by_tgusername(target_username)
     except TypeError:
