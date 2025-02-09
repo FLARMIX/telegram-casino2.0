@@ -5,6 +5,7 @@ from handlers.init_router import router
 from database.database import Database
 from scripts.scripts import Scripts
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -18,6 +19,40 @@ async def inline_roulette(inline_query: InlineQuery):
 
     # Получаем текст запроса (ставка и тип ставки)
     query = inline_query.query.strip()
+    if query == "я":
+        if not db.get_user_by_tgid(user_id):
+            result_text = "Вы не зарегистрированы, используйте /register"
+        else:
+            balance_main = str(db.get_user_stat(user_id, "balance_main"))
+            balance_alt = str(db.get_user_stat(user_id, "balance_alt"))
+            bonus_count = str(db.get_user_stat(user_id, "bonus_count"))
+            mini_bonus_count = str(db.get_user_stat(user_id, "mini_bonus_count"))
+
+            # Получаем список предметов (без картинок)
+            items = db.get_user_items(user_id)
+            avatar_items = {item: count for item, count in items.items() if db.get_item_type(item) == "avatar"}
+            property_items = {item: count for item, count in items.items() if db.get_item_type(item) != "avatar"}
+
+            result_text = (
+                f'💰 Ваш Баланс: {scr.amount_changer(balance_main)}$\n'
+                f'💰 "Word Of Alternative Balance": {scr.amount_changer(balance_alt)}\n'
+                f'🎁 Кол-во бонусов: {scr.amount_changer(bonus_count)}\n'
+                f'🤶🏻 Кол-во мини-бонусов: {scr.amount_changer(mini_bonus_count)}\n'
+                f'🎒 Витринные предметы: {", ".join([f"{item} (x{count})" for item, count in avatar_items.items()])}\n'
+                f'📦 Имущество: {", ".join([f"{item} (x{count})" for item, count in property_items.items()])}'
+            )
+
+        result = InlineQueryResultArticle(
+            id="1",
+            title="Ваш профиль",
+            description="Посмотреть информацию о себе",
+            input_message_content=InputTextMessageContent(
+                message_text=result_text, parse_mode="HTML"
+            )
+        )
+        await inline_query.answer([result], cache_time=1)
+        return
+
     try:
         stack, amount = query.split()  # Разделяем запрос на тип ставки и сумму
     except ValueError:
@@ -76,6 +111,7 @@ async def inline_roulette(inline_query: InlineQuery):
 
     # Обновляем баланс пользователя
     db.update_user("balance_main", balance_main - int_amount, user_id)
+    new_balance = db.get_user_stat(user_id, 'balance_main')
 
     # Симуляция результата рулетки
     if stack in ['черное', 'чёрное', 'красное', 'чет', 'чёт', 'нечет', 'нечёт']:
@@ -83,7 +119,7 @@ async def inline_roulette(inline_query: InlineQuery):
         current_stack = scr.pic_color(number)
         if status:
             win_amount = int_amount * 2
-            db.update_user('balance_main', balance_main + win_amount, user_id)
+            db.update_user('balance_main', new_balance + win_amount, user_id)
             current_balance = db.get_user_stat(user_id, "balance_main")
             result_text = (
                 f"🎉 [{stack} {amount}] {number} - {current_stack.capitalize()}! Ставка x2! Вы выиграли "
@@ -102,7 +138,7 @@ async def inline_roulette(inline_query: InlineQuery):
         current_stack = scr.pic_color(number)
         if status:
             win_amount = int_amount * 36
-            db.update_user('balance_main', balance_main + win_amount, user_id)
+            db.update_user('balance_main', new_balance + win_amount, user_id)
             current_balance = db.get_user_stat(user_id, "balance_main")
             result_text = (
                 f"🎉 [{stack} {amount}] {number} - {current_stack.capitalize()}! Ставка x36🤑!!! Вы выиграли "

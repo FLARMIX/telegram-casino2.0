@@ -1,7 +1,10 @@
 from json import load
 from random import randint as ri
 from random import choice
+from aiogram import Bot
 import os
+
+from config import CHANNEL_ID
 
 
 class Scripts:
@@ -13,6 +16,23 @@ class Scripts:
 
         self.admin_name = "@FLARMIX"
         self.channel_name = "@PidorsCasino"
+
+    async def check_channel_subscription(self, bot: Bot, user_id: int) -> bool:
+        """
+        Проверяет, подписан ли пользователь на канал.
+
+        :param bot: Объект бота (aiogram.Bot).
+        :param user_id: ID пользователя, которого нужно проверить.
+        :return: True, если пользователь подписан, иначе False.
+        """
+        channel_id = CHANNEL_ID
+        try:
+            member = await bot.get_chat_member(chat_id=channel_id, user_id=user_id)
+            return member.status in ['member', 'administrator', 'creator']
+        except Exception as e:
+            # Обработка ошибок, например, если бот не имеет доступа к каналу
+            print(f"Ошибка при проверке подписки: {e}")
+            return False
 
     def randomize_emoji(self, win: bool) -> str:
         if win:

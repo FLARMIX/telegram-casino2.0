@@ -42,7 +42,7 @@ async def bonus(message: Message):
             )
             return
 
-    BONUS_AMOUNT = 50000
+    BONUS_AMOUNT = 50_000_0000
     db.update_user('balance_main', balance_main + BONUS_AMOUNT, user_id)
     # Сохраняем текущее время как строку в формате БД
     db.update_user('last_bonus_time', datetime.now().strftime('%Y-%m-%d %H:%M:%S'), user_id)

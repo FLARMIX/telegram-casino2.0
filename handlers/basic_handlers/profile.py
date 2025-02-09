@@ -53,9 +53,9 @@ async def me(message: Message):
         f'📦 Имущество: {", ".join([f"{item} (x{count})" for item, count in property_items.items()])}'
     )
 
-    image = Image.new('RGB', (500, 500), (255, 255, 255))
+    image = Image.new('RGB', (250, 250), (255, 255, 255))
 
-    item_img = Image.open(avatar_path).resize((500, 500))
+    item_img = Image.open(avatar_path).resize((250, 250))
     image.paste(item_img, (0, 0))
 
     img_byte_arr = BytesIO()

@@ -1,3 +1,4 @@
+from aiogram import Bot
 from aiogram.types import Message
 from aiogram.filters import Command
 from aiogram.utils.markdown import hlink
@@ -10,7 +11,7 @@ from scripts.scripts import Scripts
 
 @router.message(Command('slot'))
 @router.message(Command('автомат'))
-async def slot_machine(message: Message):
+async def slot_machine(message: Message, bot: Bot):
     db = Database()
     scr = Scripts()
 
@@ -19,7 +20,14 @@ async def slot_machine(message: Message):
     username = db.get_user_stat(user_id, "username")
     tg_username = db.get_user_stat(user_id, "tgusername")[1:]
     formated_name = hlink(f'{username}', f'https://t.me/{tg_username}')
+    user_channel_status = scr.check_channel_subscription(bot, user_id)
     command, amount = message.text.lower().split() if len(message.text.split()) > 1 else (message.text.split()[0], '50к')
+
+    if not user_channel_status:
+        await message.answer('Вы не подписаны на канал, подпишитесь на мой канал @PidorsCasino'
+                             '\nЧтобы получить доступ к боту, вам необходимо подписаться на мой канал.',
+                             reply_to_message_id=message.message_id)
+        return
 
     if not db.check_user_in(user_id):
         await message.answer('Вы не зарегистрированы, пожалуйста, зарегистрируйтесь с помощью /register',
