@@ -3,10 +3,12 @@ from aiogram.filters import Command
 from aiogram.types import BufferedInputFile
 from aiogram import F
 from aiogram.types import CallbackQuery
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from database.methods import get_user_by_tguserid, get_user_items, get_item_by_name
 from handlers.init_router import router
 
-from database.database import Database
+from database.models import ItemType
 
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
@@ -32,13 +34,17 @@ async def show_items_menu(message: Message):
 
 
 @router.callback_query(F.data == "items_avatar")
-async def show_avatar_items(callback: CallbackQuery):
-    db = Database()
-    user_id = callback.from_user.id
+async def show_avatar_items(callback: CallbackQuery, session: AsyncSession):
+    user = await get_user_by_tguserid(session, callback.from_user.id)
 
     # Получаем предметы с типом "avatar"
-    items = db.get_user_items(user_id)
-    avatar_items = {item: count for item, count in items.items() if db.get_item_type(item) == "avatar"}
+    items = await get_user_items(session, user.tguserid)
+
+    avatar_items = dict()
+    for item, count in items.items():
+        item_obj = await get_item_by_name(session, item)
+        if item_obj.item_type == ItemType.AVATAR:
+            avatar_items[item] = count
 
     if not avatar_items:
         await callback.message.answer("У вас нет аватарок.", reply_to_message_id=callback.message.message_id)
@@ -47,9 +53,9 @@ async def show_avatar_items(callback: CallbackQuery):
     # Создание объединенного изображения для аватарок
     all_paths = []
     for item, count in avatar_items.items():  # Итерируем по словарю
-        item_path = db.get_item_path(item)
-        if item_path:
-            all_paths.append((item_path, count))  # Сохраняем путь и количество
+        item_path = await get_item_by_name(session, item)
+        if item_path and item_path.item_path:
+            all_paths.append((item_path.item_path, count))  # Сохраняем путь и количество
 
     if not all_paths:
         await callback.message.answer("Нет доступных изображений для ваших аватарок.",
@@ -118,13 +124,17 @@ async def show_avatar_items(callback: CallbackQuery):
 
 
 @router.callback_query(F.data == "items_property")
-async def show_property_items(callback: CallbackQuery):
-    db = Database()
+async def show_property_items(callback: CallbackQuery, session: AsyncSession):
     user_id = callback.from_user.id
 
     # Получаем предметы с типом, отличным от "avatar"
-    items = db.get_user_items(user_id)
-    property_items = {item: count for item, count in items.items() if db.get_item_type(item) != "avatar"}
+    items = await get_user_items(session, user_id)
+
+    property_items = dict()
+    for item, count in items.items():
+        item_obj = await get_item_by_name(session, item)
+        if item_obj.item_type != ItemType.AVATAR: # TODO: != ItemType.AVATAR <- костыль, нужно исправить в будущем.
+            property_items[item] = count
 
     if not property_items:
         await callback.message.answer("У вас нет имущества.", reply_to_message_id=callback.message.message_id)
@@ -136,12 +146,11 @@ async def show_property_items(callback: CallbackQuery):
 
 
 @router.callback_query(F.data == "items_all")
-async def show_all_items(callback: CallbackQuery):
-    db = Database()
+async def show_all_items(callback: CallbackQuery, session: AsyncSession):
     user_id = callback.from_user.id
 
     # Получаем все предметы пользователя
-    items = db.get_user_items(user_id)
+    items = await get_user_items(session, user_id)
 
     if not items:
         await callback.message.answer("У вас нет ни одного предмета.", reply_to_message_id=callback.message.message_id)

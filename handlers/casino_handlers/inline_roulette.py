@@ -1,37 +1,70 @@
+from aiogram import Bot
 from aiogram.types import InlineQuery, InlineQueryResultArticle, InputTextMessageContent
 import logging
 
-from handlers.init_router import router
-from database.database import Database
-from scripts.scripts import Scripts
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from config import ADMIN_IDs
+from database.methods import get_user_by_tguserid, get_user_stat, get_user_items, get_item_by_name, check_user_in, \
+    update_user
+from database.models import ItemType
+from handlers.init_router import router
+from scripts.scripts import Scripts
 
 logger = logging.getLogger(__name__)
 
 
 @router.inline_query()
-async def inline_roulette(inline_query: InlineQuery):
-    db = Database()
+async def inline_roulette(inline_query: InlineQuery, bot: Bot, session: AsyncSession):
     scr = Scripts()
 
-    user_id = inline_query.from_user.id
-    balance_main = db.get_user_stat(user_id, "balance_main")
+    user = await get_user_by_tguserid(session, inline_query.from_user.id)
+    user_id = user.tguserid
+    balance_main = user.balance_main
+
+    user_channel_status = await scr.check_channel_subscription(bot, user_id)
+
+    if not user_channel_status:
+        result = InlineQueryResultArticle(
+            id="1",
+            title="Подпишись прежде чем играть!",
+            descriprion='Вы не подписаны на канал, подпишитесь на мой канал @PidorsCasino'
+                        '\nЧтобы получить доступ к боту, вам необходимо подписаться на мой канал.',
+            input_message_content=InputTextMessageContent(
+                message_text="Вы не подписаны на канал, подпишитесь на мой канал @PidorsCasino"
+                             "\nЧтобы получить доступ к боту, вам необходимо подписаться на мой канал."
+            )
+        )
+        await inline_query.answer([result], cache_time=1)
+        return
 
     # Получаем текст запроса (ставка и тип ставки)
     query = inline_query.query.strip()
     if query == "я":
-        if not db.get_user_by_tgid(user_id):
-            result_text = "Вы не зарегистрированы, используйте /register"
+        if not await get_user_by_tguserid(session, user_id):
+            result_text = "Вы не зарегистрированы, используйте /register в боте!"
         else:
-            balance_main = str(db.get_user_stat(user_id, "balance_main"))
-            balance_alt = str(db.get_user_stat(user_id, "balance_alt"))
-            bonus_count = str(db.get_user_stat(user_id, "bonus_count"))
-            mini_bonus_count = str(db.get_user_stat(user_id, "mini_bonus_count"))
+            user = await get_user_by_tguserid(session, user_id)
+            balance_main = str(user.balance_main)
+            balance_alt = str(user.balance_alt)
+            bonus_count = str(user.bonus_count)
+            mini_bonus_count = str(user.mini_bonus_count)
+            rank = user.rank
 
             # Получаем список предметов (без картинок)
-            items = db.get_user_items(user_id)
-            avatar_items = {item: count for item, count in items.items() if db.get_item_type(item) == "avatar"}
-            property_items = {item: count for item, count in items.items() if db.get_item_type(item) != "avatar"}
+            items = await get_user_items(session, user_id)
+            avatar_items = dict()
+            property_items = dict()
+
+            for item, count in items.items():
+                item_obj = await get_item_by_name(session, item)
+                if item_obj.item_type == ItemType.AVATAR:
+                    avatar_items[item] = count
+
+            for item, count in items.items():
+                item_obj = await get_item_by_name(session, item)
+                if item_obj.item_type != ItemType.AVATAR:  # TODO: != ItemType.AVATAR <- костыль, нужно исправить в будущем.
+                    property_items[item] = count
 
             result_text = (
                 f'💰 Ваш Баланс: {scr.amount_changer(balance_main)}$\n'
@@ -39,7 +72,8 @@ async def inline_roulette(inline_query: InlineQuery):
                 f'🎁 Кол-во бонусов: {scr.amount_changer(bonus_count)}\n'
                 f'🤶🏻 Кол-во мини-бонусов: {scr.amount_changer(mini_bonus_count)}\n'
                 f'🎒 Витринные предметы: {", ".join([f"{item} (x{count})" for item, count in avatar_items.items()])}\n'
-                f'📦 Имущество: {", ".join([f"{item} (x{count})" for item, count in property_items.items()])}'
+                f'📦 Имущество: {", ".join([f"{item} (x{count})" for item, count in property_items.items()])}\n'
+                f'💻 Ранг: {rank}'
             )
 
         result = InlineQueryResultArticle(
@@ -68,7 +102,7 @@ async def inline_roulette(inline_query: InlineQuery):
         await inline_query.answer([result], cache_time=1)
         return
 
-    if not db.check_user_in(user_id):
+    if not await check_user_in(session, user_id):
         result = InlineQueryResultArticle(
             id="1",
             title="Ошибка",
@@ -101,17 +135,17 @@ async def inline_roulette(inline_query: InlineQuery):
         result = InlineQueryResultArticle(
             id="1",
             title="Ошибка",
-            description=f"У вас недостаточно средств! Ваш баланс: {scr.amount_changer(balance_main)}$",
+            description=f"У вас недостаточно средств! Ваш баланс: {scr.amount_changer(str(balance_main))}$",
             input_message_content=InputTextMessageContent(
-                message_text=f"У вас недостаточно средств! Ваш баланс: {scr.amount_changer(balance_main)}$"
+                message_text=f"У вас недостаточно средств! Ваш баланс: {scr.amount_changer(str(balance_main))}$"
             )
         )
         await inline_query.answer([result], cache_time=1)
         return
 
     # Обновляем баланс пользователя
-    db.update_user("balance_main", balance_main - int_amount, user_id)
-    new_balance = db.get_user_stat(user_id, 'balance_main')
+    await update_user(session, "balance_main", balance_main - int_amount, user_id)
+    new_balance = await get_user_stat(session, user_id, 'balance_main')
 
     # Симуляция результата рулетки
     if stack in ['черное', 'чёрное', 'красное', 'чет', 'чёт', 'нечет', 'нечёт']:
@@ -119,15 +153,15 @@ async def inline_roulette(inline_query: InlineQuery):
         current_stack = scr.pic_color(number)
         if status:
             win_amount = int_amount * 2
-            db.update_user('balance_main', new_balance + win_amount, user_id)
-            current_balance = db.get_user_stat(user_id, "balance_main")
+            await update_user(session, 'balance_main', new_balance + win_amount, user_id)
+            current_balance = await get_user_stat(session, user_id, "balance_main")
             result_text = (
                 f"🎉 [{stack} {amount}] {number} - {current_stack.capitalize()}! Ставка x2! Вы выиграли "
                 f"{scr.amount_changer(str(win_amount))}$!\n"
                 f"Ваш баланс: {scr.amount_changer(str(current_balance))}$"
             )
         else:
-            current_balance = db.get_user_stat(user_id, "balance_main")
+            current_balance = await get_user_stat(session, user_id, "balance_main")
             result_text = (
                 f"😢 [{stack} {amount}] {number} - {current_stack.capitalize()}! Вы проиграли "
                 f"{scr.amount_changer(str(int_amount))}$.\n"
@@ -138,15 +172,15 @@ async def inline_roulette(inline_query: InlineQuery):
         current_stack = scr.pic_color(number)
         if status:
             win_amount = int_amount * 36
-            db.update_user('balance_main', new_balance + win_amount, user_id)
-            current_balance = db.get_user_stat(user_id, "balance_main")
+            await update_user(session, 'balance_main', new_balance + win_amount, user_id)
+            current_balance = await get_user_stat(session, user_id, "balance_main")
             result_text = (
                 f"🎉 [{stack} {amount}] {number} - {current_stack.capitalize()}! Ставка x36🤑!!! Вы выиграли "
                 f"{scr.amount_changer(str(win_amount))}$!\n"
                 f"Ваш баланс: {scr.amount_changer(str(current_balance))}$"
             )
         else:
-            current_balance = db.get_user_stat(user_id, "balance_main")
+            current_balance = await get_user_stat(session, user_id, "balance_main")
             result_text = (
                 f"😢 [{stack} {amount}] {number} - {current_stack.capitalize()}! Вы проиграли "
                 f"{scr.amount_changer(str(int_amount))}$.\n"

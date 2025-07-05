@@ -3,49 +3,73 @@ from io import BytesIO
 from PIL import Image
 from aiogram.types import Message, BufferedInputFile
 from aiogram.filters import Command
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from config import ADMIN_IDs
+from database.methods import get_user_by_tguserid, check_user_in, get_user_by_tgusername, get_user_avatar, \
+    get_item_by_name, get_user_items
+from database.models import ItemType
 from handlers.init_router import router
-from database.database import Database
 from scripts.scripts import Scripts
 from aiogram.utils.markdown import hlink
 
 
 @router.message(Command('инфо'))
 @router.message(Command('info'))
-async def info(message: Message):
-    db = Database()
+async def info(message: Message, session: AsyncSession):
     scr = Scripts()
-    user_id = message.from_user.id
+    user = await get_user_by_tguserid(session, message.from_user.id)
 
     command, target_username = message.text.split()
 
-    if not db.check_user_in(user_id):
+    if not await check_user_in(session, user.tguserid):
         await message.answer('Вы не зарегистрированы, пожалуйста, зарегистрируйтесь с помощью /register',
                              reply_to_message_id=message.message_id)
         return
 
-    try:
-        target_id = db.get_user_id_by_tgusername(target_username)
-    except TypeError:
+
+    target = await get_user_by_tgusername(session, target_username)
+    if not target:
         await message.answer(f'Пользователь с юзом "{target_username}" не найден.',
                              reply_to_message_id=message.message_id)
-        return
 
-    if db.check_user_in(target_id):
-        tg_username = db.get_user_stat(target_id, "tgusername")[1:]
-        username = db.get_user_stat(target_id, "username")
-        formated_username = hlink(f'{username}', f'https://t.me/{tg_username}')
-        balance_main = str(db.get_user_stat(target_id, 'balance_main'))
-        balance_alt = str(db.get_user_stat(target_id, 'balance_alt'))
-        bonus_count = str(db.get_user_stat(target_id, 'bonus_count'))
-        mini_bonus_count = str(db.get_user_stat(target_id, 'mini_bonus_count'))
 
-        avatar_item = db.get_user_avatar(target_id)
-        avatar_path = db.get_item_path(avatar_item)
+    if await check_user_in(session, target.tguserid):
+        tg_username = target.tgusername
+        tg_username = tg_username[1:]
+
+        is_hidden = target.is_hidden
+        username = target.username
+
+        if is_hidden:
+            formated_username = username
+        else:
+            formated_username = hlink(f'{username}', f'https://t.me/{tg_username}')
+
+        balance_main = str(target.balance_main)
+        balance_alt = str(target.balance_alt)
+        bonus_count = str(target.bonus_count)
+        mini_bonus_count = str(target.mini_bonus_count)
+        rank = str(target.rank)
+
+        avatar_item = await get_user_avatar(session, target.tguserid)
+        item_obj = await get_item_by_name(session, avatar_item)
+        avatar_path = str(item_obj.item_path)
 
         # Получаем список предметов
-        items = db.get_user_items(target_id)
-        avatar_items = {item: count for item, count in items.items() if db.get_item_type(item) == "avatar"}
-        property_items = {item: count for item, count in items.items() if db.get_item_type(item) != "avatar"}
+        items = await get_user_items(session, target.tguserid)
+        avatar_items = dict()
+        property_items = dict()
+
+        for item, count in items.items():
+            item_obj = await get_item_by_name(session, item)
+            if item_obj.item_type == ItemType.AVATAR:
+                avatar_items[item] = count
+
+        for item, count in items.items():
+            item_obj = await get_item_by_name(session, item)
+            if item_obj.item_type != ItemType.AVATAR:  # TODO: != ItemType.AVATAR <- костыль, нужно исправить в будущем.
+                property_items[item] = count
 
         # Формируем текст профиля
         profile_text = (
@@ -56,7 +80,8 @@ async def info(message: Message):
             f'🤶🏻 Кол-во мини-бонусов: {scr.amount_changer(mini_bonus_count)}\n'
             f'🖼️ Аватар: {avatar_item}\n'
             f'🎒 Витринные предметы: {", ".join([f"{item} (x{count})" for item, count in avatar_items.items()])}\n'
-            f'📦 Имущество: {", ".join([f"{item} (x{count})" for item, count in property_items.items()])}'
+            f'📦 Имущество: {", ".join([f"{item} (x{count})" for item, count in property_items.items()])}\n'
+            f'💻 Ранг: {rank}'
         )
 
         image = Image.new('RGB', (250, 250), (255, 255, 255))

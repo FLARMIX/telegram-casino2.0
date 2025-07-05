@@ -6,3 +6,4 @@ from . import player_info
 from . import pay
 from . import change_name
 from . import items
+from . import slavery

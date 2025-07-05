@@ -5,10 +5,13 @@ from aiogram.filters import Command
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from config import ADMIN_IDs
+from database.methods import (get_user_by_tguserid, get_user_by_tgusername, update_user,
+                              get_user_stat, add_item_to_user, update_items)
 from handlers.init_router import router
 
-from database.database import Database
 from scripts.scripts import Scripts
 
 
@@ -33,11 +36,10 @@ class AddItemStates(StatesGroup):
 
 # Команда /admin
 @router.message(Command("admin"))
-async def admin_menu(message: Message, state: FSMContext):
-    db = Database()
-    user_id = message.from_user.id
+async def admin_menu(message: Message, session: AsyncSession):
+    user = await get_user_by_tguserid(session, message.from_user.id)
 
-    if not db.get_user_stat(user_id, "is_admin"):
+    if not str(user.tguserid) in ADMIN_IDs:
         await message.answer("❌ Вы не администратор.")
         return
 
@@ -97,7 +99,7 @@ async def username_entered(message: Message, state: FSMContext):
 
 # Обработка ввода суммы
 @router.message(SetBalanceStates.entering_amount)
-async def amount_entered(message: Message, state: FSMContext, db: Database):
+async def amount_entered(message: Message, state: FSMContext, session: AsyncSession):
     scr = Scripts()
     user_data = await state.get_data()  # Получаем сохраненные данные
 
@@ -111,20 +113,20 @@ async def amount_entered(message: Message, state: FSMContext, db: Database):
 
     # Ищем пользователя
     try:
-        target_id = db.get_user_id_by_tgusername('@' + user_data["username"])
+        target = await get_user_by_tgusername(session, '@' + user_data["username"])
     except Exception:
         await message.answer("❌ Пользователь не найден.")
         await state.clear()
         return
 
     # Устанавливаем баланс
-    db.update_user(user_data["currency_type"], amount, target_id)
+    await update_user(session, user_data["currency_type"], amount, target.tguserid)
 
     # Форматируем сумму
     formatted_amount = scr.amount_changer(str(amount))
 
     await message.answer(
-        f"✅ Пользователю @{user_data['username']} установлен баланс {formatted_amount}$!"
+        f"✅ Пользователю @{user_data['username']} установлен баланс {formatted_amount} Word Of Alternative Balance!"
     )
     await state.clear()
 
@@ -171,8 +173,7 @@ async def username_entered(message: Message, state: FSMContext):
 
 # Обработка ввода суммы
 @router.message(GiveBalanceStates.entering_amount)
-async def amount_entered(message: Message, state: FSMContext):
-    db = Database()
+async def amount_entered(message: Message, state: FSMContext, session: AsyncSession):
     scr = Scripts()
     user_data = await state.get_data()  # Получаем сохраненные данные
 
@@ -187,15 +188,15 @@ async def amount_entered(message: Message, state: FSMContext):
     # Ищем пользователя
     try:
         print(user_data)
-        target_id = db.get_user_id_by_tgusername('@' + user_data["username"])
+        target = await get_user_by_tgusername(session, '@' + user_data["username"])
     except Exception:
         await message.answer("❌ Пользователь не найден.")
         await state.clear()
         return
 
     # Обновляем баланс
-    current_balance = db.get_user_stat(target_id, user_data["currency_type"])
-    db.update_user(user_data["currency_type"], current_balance + amount, target_id)
+    current_balance = await get_user_stat(session, target.tguserid, user_data["currency_type"])
+    await update_user(session, user_data["currency_type"], current_balance + amount, target.tguserid)
 
     # Форматируем сумму
     formatted_amount = scr.amount_changer(str(amount))
@@ -236,8 +237,7 @@ async def item_entered(message: Message, state: FSMContext):
 
 # Обработка ввода количества
 @router.message(AddItemStates.entering_quantity)
-async def quantity_entered(message: Message, state: FSMContext):
-    db = Database()
+async def quantity_entered(message: Message, state: FSMContext, session: AsyncSession):
     user_data = await state.get_data()  # Получаем сохраненные данные
 
     # Проверяем, что количество — число
@@ -249,7 +249,7 @@ async def quantity_entered(message: Message, state: FSMContext):
 
     # Ищем пользователя
     try:
-        target_id = db.get_user_id_by_tgusername('@' + user_data["username"])
+        target = await get_user_by_tgusername(session, '@' + user_data["username"])
     except Exception:
         await message.answer("❌ Пользователь не найден.")
         await state.clear()
@@ -257,8 +257,7 @@ async def quantity_entered(message: Message, state: FSMContext):
 
     # Выдаем предмет
     try:
-        for _ in range(quantity):
-            db.add_item_to_user(target_id, user_data["item"])
+        await add_item_to_user(session, target.tguserid, user_data["item"], count=quantity)
     except ValueError as e:
         await message.answer(str(e))
         await state.clear()
@@ -301,8 +300,7 @@ async def item_entered(message: Message, state: FSMContext):
 
 # Обработка ввода количества
 @router.message(AddItemStates.entering_quantity)
-async def quantity_entered(message: Message, state: FSMContext):
-    db = Database()
+async def quantity_entered(message: Message, state: FSMContext, session: AsyncSession):
     user_data = await state.get_data()  # Получаем сохраненные данные
 
     # Проверяем, что количество — число
@@ -314,7 +312,7 @@ async def quantity_entered(message: Message, state: FSMContext):
 
     # Ищем пользователя
     try:
-        target_id = db.get_user_id_by_tgusername('@' + user_data["username"])
+        target = await get_user_by_tgusername(session, '@' + user_data["username"])
     except Exception:
         await message.answer("❌ Пользователь не найден.")
         await state.clear()
@@ -322,8 +320,7 @@ async def quantity_entered(message: Message, state: FSMContext):
 
     # Выдаем предмет
     try:
-        for _ in range(quantity):
-            db.add_item_to_user(target_id, user_data["item"])
+        await add_item_to_user(session, target.tguserid, user_data["item"], count=quantity)
     except ValueError as e:
         await message.answer(str(e))
         await state.clear()
@@ -337,14 +334,13 @@ async def quantity_entered(message: Message, state: FSMContext):
 
 # Обработка кнопки "Обновить предметы"
 @router.callback_query(F.data == "update_items")
-async def update_items_handler(callback: CallbackQuery):
-    db = Database()
+async def update_items_handler(callback: CallbackQuery, session: AsyncSession):
     user_id = callback.from_user.id
 
-    if db.get_user_stat(user_id, "is_admin"):
+    if await get_user_stat(session, user_id, "is_admin"):
         with open("handlers/admin_handlers/items.json", 'r', encoding='utf-8') as json_data:
             data = loads(json_data.read())
-        db.update_items(data)
+        await update_items(session, data)
         await callback.message.answer("✅ Предметы обновлены.", reply_to_message_id=callback.message.message_id)
 
 

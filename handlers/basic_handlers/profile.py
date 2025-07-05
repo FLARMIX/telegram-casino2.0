@@ -3,43 +3,68 @@ from io import BytesIO
 from PIL import Image
 from aiogram.types import Message, BufferedInputFile
 from aiogram.filters import Command
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from config import ADMIN_IDs
+from database.methods import get_user_by_tguserid, update_user, get_item_by_name, get_user_avatar, get_user_items
+from database.models import ItemType
 from handlers.init_router import router
-from database.database import Database
 from scripts.scripts import Scripts
 from aiogram.utils.markdown import hlink
 
 
 @router.message(Command('я'))
 @router.message(Command('me'))
-async def me(message: Message):
-    db = Database()
+async def me(message: Message, session: AsyncSession):
     scr = Scripts()
     user_id = message.from_user.id
     username = message.from_user.username
 
-    if not db.get_user_by_tgid(user_id):
+    if not await get_user_by_tguserid(session, user_id):
         await message.answer('Вы не зарегистрированы, пожалуйста, зарегистрируйтесь с помощью /register')
         return
 
-    if not db.get_user_stat(user_id, 'tgusername')[1:] == username:
-        db.update_user('tgusername', '@' + username, user_id)
+    user = await get_user_by_tguserid(session, message.from_user.id)
+    is_username = user.tgusername
+    if not is_username[1:] == username:
+        await update_user(session, 'tgusername', '@' + username, user.tguserid)
 
-    tg_username = db.get_user_stat(user_id, "tgusername")[1:]
-    username = db.get_user_stat(user_id, "username")
-    formated_username = hlink(f'{username}', f'https://t.me/{tg_username}')
-    balance_main = str(db.get_user_stat(user_id, 'balance_main'))
-    balance_alt = str(db.get_user_stat(user_id, 'balance_alt'))
-    bonus_count = str(db.get_user_stat(user_id, 'bonus_count'))
-    mini_bonus_count = str(db.get_user_stat(user_id, 'mini_bonus_count'))
+    tg_username = user.tgusername
+    tg_username = tg_username[1:]
+
+    is_hidden = user.is_hidden
+    username = user.username
+
+    if is_hidden:
+        formated_username = username
+    else:
+        formated_username = hlink(f'{username}', f'https://t.me/{tg_username}')
+
+    balance_main = str(user.balance_main)
+    balance_alt = str(user.balance_alt)
+    bonus_count = str(user.bonus_count)
+    mini_bonus_count = str(user.mini_bonus_count)
+    rank = str(user.rank)
 
     # Получаем аватар игрока
-    avatar_item = db.get_user_avatar(user_id)
-    avatar_path = db.get_item_path(avatar_item)
+    avatar_item = await get_user_avatar(session, user.tguserid)
+    item_obj = await get_item_by_name(session, avatar_item)
+    avatar_path = str(item_obj.item_path)
 
     # Получаем список предметов
-    items = db.get_user_items(user_id)
-    avatar_items = {item: count for item, count in items.items() if db.get_item_type(item) == "avatar"}
-    property_items = {item: count for item, count in items.items() if db.get_item_type(item) != "avatar"}
+    items = await get_user_items(session, user.tguserid)
+    avatar_items = dict()
+    property_items = dict()
+
+    for item, count in items.items():
+        item_obj = await get_item_by_name(session, item)
+        if item_obj.item_type == ItemType.AVATAR:
+            avatar_items[item] = count
+
+    for item, count in items.items():
+        item_obj = await get_item_by_name(session, item)
+        if item_obj.item_type != ItemType.AVATAR:  # TODO: != ItemType.AVATAR <- костыль, нужно исправить в будущем.
+            property_items[item] = count
 
     # Формируем текст профиля
     profile_text = (
@@ -50,7 +75,8 @@ async def me(message: Message):
         f'🤶🏻 Кол-во мини-бонусов: {scr.amount_changer(mini_bonus_count)}\n'
         f'🖼️ Аватар: {avatar_item}\n'
         f'🎒 Витринные предметы: {", ".join([f"{item} (x{count})" for item, count in avatar_items.items()])}\n'
-        f'📦 Имущество: {", ".join([f"{item} (x{count})" for item, count in property_items.items()])}'
+        f'📦 Имущество: {", ".join([f"{item} (x{count})" for item, count in property_items.items()])}\n'
+        f'💻 Ранг: {rank}'
     )
 
     image = Image.new('RGB', (250, 250), (255, 255, 255))

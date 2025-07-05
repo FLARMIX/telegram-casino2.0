@@ -1,17 +1,54 @@
+import logging
+
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.fsm.storage.memory import MemoryStorage
+import asyncio
+
+from database.SQLmodels import User
 
 import config
+from database.methods import init_db
+from database.session import AsyncSessionLocal
 from handlers.init_router import router
+from console.console import ConsoleManager
+from middleware.database_session import DBSessionMiddleware
+
+
+# (1, 'суперБабка', 1548320000, 0, '2025-06-28 01:34:14', '1970-01-01 00:00:00', 0, 2, 'None', 'None', 0, 1, 0, 'None', '@FLARMIX', 1438395869)
+async def auto_calculate_payouts(user: User):
+    await db.init_db()
+    while True: # TODO Логика пополнения копилки рабства будет тут
+        if user.your_slave != "None":
+            await db.calculate_payout(user.your_slave)
+
+async def user_cycle():
+    users = await db.get_all_users()
+    for user in users:
+        asyncio.create_task(auto_calculate_payouts(user, db))
 
 
 async def main_run():
+    await init_db()
+
+    logger = logging.getLogger(__name__)
     bot = Bot(token=config.BOT_TOKEN, default=DefaultBotProperties(parse_mode='HTML'))
     dp = Dispatcher(storage=MemoryStorage())
     dp.include_router(router)
 
+    dp.message.middleware(DBSessionMiddleware())
+    dp.callback_query.middleware(DBSessionMiddleware())
+
     dp["bot"] = bot
+    dp["logger"] = logger
+
+    session = AsyncSessionLocal()
+
+    console = ConsoleManager(session, logger, bot)
+    asyncio.create_task(console.start_console())
 
     await bot.delete_webhook(drop_pending_updates=True)
-    await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
+    try:
+        await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
+    finally:
+        await session.close()

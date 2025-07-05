@@ -4,30 +4,39 @@ from aiogram.utils.markdown import hlink
 
 from datetime import datetime
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from database.methods import get_user_by_tguserid, check_user_in, update_user
 from handlers.init_router import router
 
-from database.database import Database
 from scripts.scripts import Scripts
 
 
 @router.message(Command('бонус'))
 @router.message(Command('bonus'))
-async def bonus(message: Message):
-    db = Database()
+async def bonus(message: Message, session: AsyncSession):
     scr = Scripts()
 
-    user_id = message.from_user.id
+    user = await get_user_by_tguserid(session, message.from_user.id)
 
-    if not db.check_user_in(user_id):
+    if not await check_user_in(session, user.tguserid):
         await message.answer('Вы не зарегистрированы, зарегистрируйтесь через /register',
                              reply_to_message_id=message.message_id)
         return
 
-    balance_main = db.get_user_stat(user_id, 'balance_main')
-    last_bonus_time_str = db.get_user_stat(user_id, 'last_bonus_time')  # Получаем строку из БД
-    username = db.get_user_stat(user_id, "username")
-    tg_username = db.get_user_stat(user_id, "tgusername")[1:]
-    formated_name = hlink(f'{username}', f'https://t.me/{tg_username}')
+    tg_username = user.tgusername
+    tg_username = tg_username[1:]
+
+    is_hidden = user.is_hidden
+    username = user.username
+
+    if is_hidden:
+        formated_username = username
+    else:
+        formated_username = hlink(f'{username}', f'https://t.me/{tg_username}')
+
+    balance_main = user.balance_main
+    last_bonus_time_str = str(user.last_bonus_time)  # Получаем строку из БД
 
     if last_bonus_time_str:
         # Преобразуем строку в объект datetime
@@ -36,20 +45,23 @@ async def bonus(message: Message):
         if time_diff.total_seconds() < 1800:
             next_bonus = 1800 - time_diff.total_seconds()
             await message.answer(
-                f"{formated_name}, следующий бонус через {int(next_bonus)} сек.!",
+                f"{formated_username}, следующий бонус через {int(next_bonus)} сек.!",
                 disable_web_page_preview=True,
                 reply_to_message_id=message.message_id
             )
             return
 
-    BONUS_AMOUNT = 50_000_0000
-    db.update_user('balance_main', balance_main + BONUS_AMOUNT, user_id)
+    BONUS_AMOUNT = 500_000_000
+
+    new_time = datetime.strptime(datetime.now().strftime('%Y-%m-%d %H:%M:%S'), '%Y-%m-%d %H:%M:%S')
+
+    await update_user(session, 'balance_main', balance_main + BONUS_AMOUNT, user.tguserid)
     # Сохраняем текущее время как строку в формате БД
-    db.update_user('last_bonus_time', datetime.now().strftime('%Y-%m-%d %H:%M:%S'), user_id)
-    db.update_user('bonus_count', db.get_user_stat(user_id, 'bonus_count') + 1, user_id)
+    await update_user(session, 'last_bonus_time', new_time, user.tguserid)
+    await update_user(session, 'bonus_count', user.bonus_count + 1, user.tguserid)
 
     await message.answer(
-        f"{formated_name}, вам начислен бонус {scr.amount_changer(str(BONUS_AMOUNT))}$!",
+        f"{formated_username}, вам начислен бонус {scr.amount_changer(str(BONUS_AMOUNT))}$!",
         disable_web_page_preview=True,
         reply_to_message_id=message.message_id
     )

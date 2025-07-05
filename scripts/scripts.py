@@ -4,6 +4,8 @@ from random import choice
 from aiogram import Bot
 import os
 
+from sqlalchemy.orm import Mapped
+
 from config import CHANNEL_ID
 
 
@@ -17,7 +19,7 @@ class Scripts:
         self.admin_name = "@FLARMIX"
         self.channel_name = "@PidorsCasino"
 
-    async def check_channel_subscription(self, bot: Bot, user_id: int) -> bool:
+    async def check_channel_subscription(self, bot: Bot, user_id: int | Mapped[int]) -> bool:
         """
         Проверяет, подписан ли пользователь на канал.
 
@@ -39,7 +41,6 @@ class Scripts:
             return choice('🥵😝😎🏆🔥')
         else:
             return choice('😢😭🥶😱😨😰😥😓')
-
 
     def unformat_number(self, formated_number: str) -> int:
         number: str = formated_number.replace(',', '')
@@ -87,3 +88,6 @@ class Scripts:
         elif stack in ['нечёт', 'нечет']:
             number = self.random_number()
             return int(number) % 2 != 0, number
+        return None
+
+
