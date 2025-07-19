@@ -1,15 +1,16 @@
+from aiogram import F
 from aiogram.types import Message
-from aiogram.filters import Command
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import ADMIN_IDs
 from database.methods import get_user_by_tguserid, get_user_by_tgusername, update_user
 from handlers.init_router import router
+from scripts.loggers import log
 from scripts.scripts import Scripts
 
 
-@router.message(Command('set'))
-@router.message(Command('сет'))
+@router.message(F.text.lower().startswith(('сет', 'set', '/сет', '/set')))
+@log("I'm logging you, my Lord...")
 async def set(message: Message, session: AsyncSession):
     scr = Scripts()
     user = await get_user_by_tguserid(session, message.from_user.id)

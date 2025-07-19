@@ -1,16 +1,16 @@
 from aiogram import Bot, F
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
-from aiogram.filters import Command
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from config import ADMIN_IDs
+from config import ADMIN_IDs, Bot_username
 from database.methods import get_user_by_tguserid, update_username, update_user
 from handlers.init_router import router
+from scripts.loggers import log
 
 
-@router.message(Command('ник'))
-@router.message(Command('nick'))
+@router.message(F.text.lower().startswith(('ник', 'nick', '/ник', '/nick')))
+@log("Logging nickname command.")
 async def nickname(message: Message, state: FSMContext, session: AsyncSession):
     user = await get_user_by_tguserid(session, message.from_user.id)
     temp_list = message.text.split()

@@ -23,7 +23,7 @@ class Scripts:
         """
         Проверяет, подписан ли пользователь на канал.
 
-        :param bot: Объект бота (aiogram.Bot).
+        :param bot: Объект бота (aiogram Bot).
         :param user_id: ID пользователя, которого нужно проверить.
         :return: True, если пользователь подписан, иначе False.
         """
@@ -35,6 +35,14 @@ class Scripts:
             # Обработка ошибок, например, если бот не имеет доступа к каналу
             print(f"Ошибка при проверке подписки: {e}")
             return False
+
+    async def check_registered(self, user, message): # TODO: Заменить все проверки этой функцией
+        if not user:
+            await message.answer('Вы не зарегистрированы, пожалуйста, зарегистрируйтесь с помощью /register',
+                                 reply_to_message_id=message.message_id)
+            return False
+        return True
+
 
     def randomize_emoji(self, win: bool) -> str:
         if win:

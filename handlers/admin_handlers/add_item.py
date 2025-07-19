@@ -3,8 +3,9 @@ from aiogram.filters import Command
 from aiogram.utils.markdown import hlink
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from config import ADMIN_IDs
 from database.methods import (get_user_stat, get_user_by_tguserid, get_user_by_tgusername,
-                              add_item_to_user, get_user_items)
+                              add_item_to_user, get_dict_user_items, get_item_by_name)
 from handlers.init_router import router
 
 
@@ -17,7 +18,7 @@ async def add_item(message: Message, session: AsyncSession):
         target_username = message.text.split()[1]
         item = ' '.join(message.text.split()[2:])
 
-    if user.is_admin:
+    if user.is_admin and str(user.tguserid) in ADMIN_IDs:
 
         target = await get_user_by_tgusername(session, target_username)
         target_id = target.tguserid
@@ -32,8 +33,9 @@ async def add_item(message: Message, session: AsyncSession):
                                  reply_to_message_id=message.message_id)
             return
 
-        await add_item_to_user(session, target_id, item)
-        user_items = await get_user_items(session, target_id)
-        await message.answer(f"Предмет '{item}' успешно добавлен к пользователю {formated_username}. "
-                             f"Теперь у него {user_items.get(item, 0)} предметов '{item}'.",
+        item = await get_item_by_name(session, item)
+        await add_item_to_user(session, target_id, item.id)
+        user_items = await get_dict_user_items(session, target_id)
+        await message.answer(f"Предмет '{item.item_name}' успешно добавлен к пользователю {formated_username}. "
+                             f"Теперь у него {user_items.get(item.item_name, 0)} предметов '{item.item_name}'.",
                              reply_to_message_id=message.message_id, disable_web_page_preview=True)

@@ -7,3 +7,6 @@ from . import pay
 from . import change_name
 from . import items
 from . import slavery
+from . import trade
+from . import sell_item
+from . import change_avatar

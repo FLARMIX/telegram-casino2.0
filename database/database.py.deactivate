@@ -1,0 +1,376 @@
+import json
+import aiosqlite as sql
+from datetime import datetime
+from typing import Any, Optional, List
+from functools import wraps
+
+from sqlalchemy import select
+
+from config import ADMIN_IDs
+# from database.SQLmodels import Base, Slavery
+from database.models import User, Slavery, Item
+
+# from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+
+# engine = create_async_engine("sqlite+aiosqlite:///main.db", echo=False)
+# AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
+
+
+def with_connection(func):
+    @wraps(func)
+    async def wrapper(self, *args, **kwargs):
+        async with sql.connect(self.db_path) as db:
+            return await func(self, db, *args, **kwargs)
+
+    return wrapper
+
+class Database:
+    def __init__(self, db_path="main.db"):
+        # корневые строки БД не подлежащие изменению
+        self.basic_rows = ['id', 'username', 'balance_main', 'balance_alt',
+                           'last_bonus_time', 'start_slave_owner_time', 'bonus_count',
+                           'is_slave', 'is_admin', 'tguserid', 'tgusername']
+        self.db_path = db_path
+        # Данные об игроках
+
+    @with_connection
+    async def init_db(self, db):
+        pass
+
+
+    @with_connection
+    async def register_user(self, db, username: str, tguserid: int) -> bool:
+        if await self.get_user_by_tguserid(tguserid) is not None:
+            return False
+
+        tgusername = '@' + username
+
+        await db.execute("INSERT INTO Users (rank, username, balance_main, balance_alt, last_bonus_time,"
+                         "last_mini_bonus_time, mini_bonus_count,"
+                         "bonus_count, your_owner, your_slave, is_immune, is_admin, is_worker,"
+                         "work_name,"
+                         "tgusername, tguserid) VALUES "
+                         "('Игрок', ?, 25000, 0, '1970-01-01 00:00:00', '1970-01-01 00:00:00', 0, 0, "
+                         "'None', 'None', 0, 0, 0, 'None', ?, ?)",
+                         (username, tgusername, tguserid))
+
+        await db.execute("INSERT INTO UserItems (items_list, avatar_item, tguserid) VALUES (?, ?, ?)",
+                         ('{}', 'черви', tguserid))
+        await db.commit()
+
+        await db.execute("INSERT INTO Slavery (tguserid, owner_id, slave_id, start_time, last_payout_time,"
+                         "piggy_bank, last_withdrawal_time) VALUES (?, null, null, '1970-01-01 00:00:00',"
+                         "'1970-01-01 00:00:00', 0, '1970-01-01 00:00:00')", (tguserid, ))
+        await db.commit()
+
+        if str(tguserid) in ADMIN_IDs:
+            await self.make_admin(tguserid)
+            if str(tguserid) in ADMIN_IDs[0]:
+                await self.change_rank(tguserid, 'Владелец')
+            else:
+                await self.change_rank(tguserid, 'Администратор')
+            # await self.make_immune_to_slavery(tguserid)
+
+
+        return True
+
+    @with_connection
+    async def free_slave(self, db, owner_id: int, slave_id: int) -> None:
+        """Освобождает раба и обнуляет статусы"""
+        try:
+            # Удаляем запись из таблицы рабства
+            await db.execute("DELETE FROM Slavery WHERE owner_id = ? AND slave_id = ?", (owner_id, slave_id))
+
+            # Обновляем статусы пользователей
+            await self.update_user("is_slave", 0, slave_id)
+            await self.update_user("your_owner", "None", slave_id)
+            await self.update_user("your_slave", "None", owner_id)
+
+            await db.commit()
+        except Exception as e:
+            print(f"Ошибка при освобождении раба: {e}")
+
+
+    # async def get_slavery_info_by_slave(self, session: AsyncSession, slave_id: int) -> Optional[Slavery]:
+    #     """Возвращает информацию о рабстве по ID раба"""
+    #     stmt = select(Slavery).where(Slavery.slave_id == slave_id)
+    #     pre_result = await session.execute(stmt)
+    #     result = pre_result.scalars().one_or_none()
+    #     return result
+
+    @with_connection
+    async def start_slavery(self, db, owner_id: int, slave_id: int) -> str:  # TODO Пересмотреть эту функцию
+        error_messages = []
+        is_immune = await self.get_user_stat(slave_id, "is_immune")
+        if int(is_immune):
+            error_messages.append("У игрока иммунитет!")
+
+        # Проверка существующего раба у владельца
+        if await self.get_slavery_info(owner_id):
+            error_messages.append("У тебя уже есть раб! 👥")
+
+        # Проверка на двойное рабство
+        if await self.get_slavery_info_by_slave(slave_id):
+            error_messages.append("Этот игрок уже в рабстве! 🔐")
+
+        if error_messages:
+            return "\n".join(error_messages)
+
+        # Запись в БД
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        try:
+            await db.execute("INSERT INTO Slavery VALUES (?, ?, ?, ?, ?, ?)",
+                             (owner_id, slave_id, current_time, current_time, 0, "1970-01-01 00:00:00"))
+            await self.make_slave(owner_id, slave_id)
+            return "success"
+        except sql.IntegrityError:
+            return "Ошибка при заключении сделки! 🔄"
+
+    @with_connection
+    async def get_slavery_info(self, db, tguserid: int) -> Optional[Slavery]:
+        rows = await db.execute("SELECT * FROM Slavery WHERE owner_id = ?", (tguserid,))
+        rows = await rows.fetchone()
+        result = None
+        if rows:
+            result = Slavery(*rows)
+        return result
+
+    @with_connection
+    async def calculate_payout(self, db, tguserid: int) -> None:
+        """Расчет начислений в копилку"""
+        slavery_info = await self.get_slavery_info(tguserid)
+        if not slavery_info:
+            return
+
+        last_payout = datetime.strptime(slavery_info.last_payout_time, "%Y-%m-%d %H:%M:%S")
+        now = datetime.now()
+
+        if (now - last_payout).total_seconds() >= 10800:  # 3 часа
+            slave_balance = await self.get_user_stat(slavery_info.slave_id, "balance_main")
+            if slave_balance <= 1_000_000:
+                payout = int(slave_balance * 0.05)
+            else:
+                payout = int(slave_balance * 0.01)  # 1% от баланса раба
+
+            # Обновляем копилку
+            await db.execute(
+                "UPDATE Slavery SET piggy_bank = ?, last_payout_time = ? WHERE owner_id = ?",
+                (slavery_info.piggy_bank + payout, now.strftime("%Y-%m-%d %H:%M:%S"), tguserid)
+            )
+            await db.commit()
+
+    @with_connection
+    async def withdraw_piggy_bank(self, db, owner_id: int):
+        slavery_info = await self.get_slavery_info(owner_id)
+        if not slavery_info:
+            return False
+
+        last_withdraw = datetime.strptime(slavery_info.last_withdrawal_time, "%Y-%m-%d %H:%M:%S")
+        now = datetime.now()
+
+        if (now - last_withdraw).total_seconds() < 86400:  # 24 часа
+            return False
+
+        await db.execute("UPDATE Slavery SET piggy_bank = 0, last_withdrawal_time = ? WHERE owner_id = ?",
+                         (now.strftime("%Y-%m-%d %H:%M:%S"), owner_id))
+        await db.commit()
+
+        return slavery_info.piggy_bank
+
+    @with_connection
+    async def get_user_by_tguserid(self, db, tguserid: int) -> Optional[User]:
+        rows = await db.execute("SELECT * FROM Users WHERE tguserid = ?", (tguserid,))
+        rows = await rows.fetchone()
+        result = None
+        if rows:
+            result = User(*rows)
+        return result
+
+    @with_connection
+    async def get_user_by_tgusername(self, db, tgusername: str) -> Optional[User]:
+        rows = await db.execute("SELECT * FROM Users WHERE tgusername =?", (tgusername,))
+        rows = await rows.fetchone()
+        result = None
+        if rows:
+            result = User(*rows)
+        return result
+
+    @with_connection
+    async def get_user_items(self, db, tguserid: int) -> dict:
+        rows = await db.execute("SELECT items_list FROM UserItems WHERE tguserid = ?", (tguserid,))
+        result = await rows.fetchone()
+        if result and result[0] != '{}':  # Проверяем, что результат не пустой и не '{}'
+            try:
+                return json.loads(result[0])  # Десериализация JSON-строки в словарь
+            except json.JSONDecodeError:
+                return {}  # Возвращаем пустой словарь, если JSON некорректен
+        return {}  # Возвращаем пустой словарь, если предметов нет
+
+    @with_connection
+    async def get_item_by_name(self, db, item_name: str) -> Optional[Item]:
+        rows = await db.execute("SELECT * FROM Items WHERE item_name =?", (item_name,))
+        rows = await rows.fetchone()
+        result = None
+        if rows:
+            result = Item(*rows)
+        return result
+
+    @with_connection
+    async def get_user_avatar(self, db, tguserid: int) -> str:
+        rows = await db.execute("SELECT avatar_item FROM UserItems WHERE tguserid =?", (tguserid,))
+        result = await rows.fetchone()
+        return result[0] if result else 'черви'  # Возвращаем аватарку по умолчанию
+
+    @with_connection
+    async def update_user(self, db, stat_name: str, value: Any, tguserid: int) -> None:
+        await db.execute("UPDATE Users SET {} =? WHERE tguserid =?".format(stat_name), (value, tguserid))
+        await db.commit()
+
+    @with_connection
+    async def update_username(self, db, username: str, tguserid: int) -> None:
+        await db.execute("UPDATE Users SET username =? WHERE tguserid =?",
+                         (username, tguserid))
+        await db.commit()
+
+    @with_connection
+    async def update_bonus(self, db, tguserid: int, current_time: datetime) -> None:
+        await db.execute("UPDATE Users SET bonus_count = bonus_count + 1, last_bonus_time =? WHERE tguserid =?",
+                         (current_time, tguserid))
+        await db.commit()
+
+    @with_connection
+    async def add_item(self, db, item_name: str, item_type: str, path: str = None,
+                       item_buy_price: int = None, item_sell_price: int = None) -> None:
+        await db.execute("INSERT INTO Items (item_name, item_path, item_type, item_buy_price, item_sell_price) "
+                         "VALUES (?,?,?,?,?)",
+                         (item_name, path, item_type, item_buy_price, item_sell_price))
+        await db.commit()
+
+    @with_connection
+    async def get_existing_items_names(self, db) -> list:
+        rows = await db.execute("SELECT item_name FROM Items")
+        return [item[0] for item in await rows.fetchall()]
+
+    @with_connection
+    async def add_item_to_user(self, db, tguserid: int, item: str) -> None:
+        if item not in await self.get_existing_items_names():
+            raise ValueError(f'Item {item} does not exist in the database')
+
+        # Получаем текущий словарь предметов
+        rows = await db.execute("SELECT items_list FROM UserItems WHERE tguserid = ?", (tguserid,))
+        result = await rows.fetchone()
+        items = json.loads(result[0]) if result and result[0] != '{}' else {}
+
+        # Увеличиваем количество предмета или добавляем новый
+        if item in items:
+            items[item] += 1
+        else:
+            items[item] = 1
+
+        # Обновляем словарь предметов в БД
+        await db.execute(
+            "UPDATE UserItems SET items_list = ? WHERE tguserid = ?",
+            (json.dumps(items, ensure_ascii=False), tguserid)  # Убедитесь, что ensure_ascii=False
+        )
+        await db.commit()
+
+    @with_connection
+    async def update_items(self, db, json_data: dict) -> None:
+        await db.execute("DELETE FROM Items")
+        await db.commit()
+
+        for item_name, item_data in json_data.items():
+            await self.add_item(item_name, item_data['type'], item_data.get('path'),
+                                item_data.get('buy_price'), item_data.get('sell_price'))
+
+        await db.commit()
+
+    @with_connection
+    async def make_admin(self, db, tguserid: int) -> None:
+        await db.execute("UPDATE Users SET is_admin = 1 WHERE tguserid =?", (tguserid,))
+        await db.commit()
+
+    @with_connection
+    async def remove_admin(self, db, tguserid: int) -> None:
+        if tguserid in ADMIN_IDs:
+            return
+
+        await db.execute("UPDATE Users SET is_admin = 0 WHERE tguserid =?", (tguserid,))
+        await db.commit()
+
+    @with_connection
+    async def check_user_in(self, db, tguserid: int) -> bool:
+        rows = await db.execute("SELECT COUNT(*) FROM Users WHERE tguserid =?", (tguserid,))
+        result = await rows.fetchone()
+        return result[0] > 0
+
+    @with_connection
+    async def add_new_row_for_all_users(self, db, row_name: str, value: int | str = None) -> None:
+        await db.execute("ALTER TABLE Users ADD COLUMN IF NOT EXISTS {} {}"
+                         .format(row_name, 'INTEGER' if isinstance(value, int) else 'TEXT'))
+
+        if value is not None:
+            await db.execute("UPDATE Users SET {} =?".format(row_name), (value,))
+
+        await db.commit()
+
+    @with_connection
+    async def delete_row_for_all_users(self, db, row_name) -> None:
+        if row_name not in self.basic_rows:
+            await db.execute("ALTER TABLE Users DROP COLUMN {}".format(row_name))
+            await db.commit()
+        else:
+            print(f"Can't delete basic row '{row_name}'")
+
+    @with_connection
+    async def make_immune_to_slavery(self, db, tguserid: int):
+        await db.execute("UPDATE Slavery SET is_immune = 1 WHERE tguserid =?", (tguserid,))
+        await db.commit()
+
+    @with_connection
+    async def remove_immunity_from_slavery(self, db, tguserid: int):
+        await db.execute("UPDATE Slavery SET is_immune = 0 WHERE tguserid =?", (tguserid,))
+        await db.commit()
+
+    @with_connection
+    async def get_all_slave_owners(self, db):
+        await db.execute("SELECT * FROM")
+
+    async def make_slave(self, owner_id: int, slave_id: int) -> None:
+        # TODO Тут че-то добавить надо ИЛИ УДАЛИТЬ см. первый TODO
+        owner_username = await self.get_user_stat(owner_id, "username")
+        target_username = await self.get_user_stat(slave_id, "username")
+        await self.update_user("your_owner", owner_username, slave_id)
+        await self.update_user("your_slave", target_username, owner_id)
+
+    @with_connection
+    async def get_user_by_id(self, db, id: int):
+        # Возможно не нужна!!!
+        rows = await db.execute("SELECT * FROM Users WHERE id =?", (id,))
+        rows = await rows.fetchone()
+        result = None
+        if rows:
+            result = User(*rows)
+        return result
+
+    @with_connection
+    async def get_all_users(self, db) -> List[User]:
+        rows = await db.execute("SELECT * FROM Users")
+        rows = await rows.fetchall()
+        result = []
+        for row in rows:
+            if row:
+                result.append(User(*row))
+        return result
+
+    @with_connection
+    async def delete_user(self, db, tguserid: int):  # Разрушительная функция
+        """
+       Удаляет пользователя из базы данных
+       :param tguserid: id пользователя
+       """
+        await db.execute("DELETE FROM Users WHERE tguserid =?", (tguserid, ))
+        await db.commit()
+
+    async def change_rank(self, tguserid: int, rank: str):
+        await self.update_user("rank", rank, tguserid)

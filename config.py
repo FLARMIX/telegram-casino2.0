@@ -9,3 +9,4 @@ load_dotenv()
 BOT_TOKEN = getenv('TOKEN')
 ADMIN_IDs = getenv('ADMIN_IDS').split()
 CHANNEL_ID = getenv('CHANNEL_ID')
+Bot_username = "pidorscasinobot" # <- SHOULD be in lower case

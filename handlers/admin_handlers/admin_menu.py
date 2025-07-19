@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import ADMIN_IDs
 from database.methods import (get_user_by_tguserid, get_user_by_tgusername, update_user,
-                              get_user_stat, add_item_to_user, update_items)
+                              get_user_stat, add_item_to_user, update_items, get_item_by_name)
 from handlers.init_router import router
 
 from scripts.scripts import Scripts
@@ -164,7 +164,7 @@ async def currency_chosen(callback: CallbackQuery, state: FSMContext):
 @router.message(GiveBalanceStates.entering_username)
 async def username_entered(message: Message, state: FSMContext):
     username = message.text.strip().replace("@", "")  # Убираем @, если есть
-    print(username)
+    print(f'Игрок {username} использует Admin меню!')
     await state.update_data(username=username)  # Сохраняем username
 
     await message.answer("💰 Введите сумму:")
@@ -187,7 +187,6 @@ async def amount_entered(message: Message, state: FSMContext, session: AsyncSess
 
     # Ищем пользователя
     try:
-        print(user_data)
         target = await get_user_by_tgusername(session, '@' + user_data["username"])
     except Exception:
         await message.answer("❌ Пользователь не найден.")
@@ -256,8 +255,9 @@ async def quantity_entered(message: Message, state: FSMContext, session: AsyncSe
         return
 
     # Выдаем предмет
+    item = await get_item_by_name(session, user_data["item"])
     try:
-        await add_item_to_user(session, target.tguserid, user_data["item"], count=quantity)
+        await add_item_to_user(session, target.tguserid, item.id, count=quantity)
     except ValueError as e:
         await message.answer(str(e))
         await state.clear()
@@ -319,8 +319,9 @@ async def quantity_entered(message: Message, state: FSMContext, session: AsyncSe
         return
 
     # Выдаем предмет
+    item = await get_item_by_name(session, user_data["item"])
     try:
-        await add_item_to_user(session, target.tguserid, user_data["item"], count=quantity)
+        await add_item_to_user(session, target.tguserid, item.id, count=quantity)
     except ValueError as e:
         await message.answer(str(e))
         await state.clear()

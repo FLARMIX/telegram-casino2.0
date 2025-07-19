@@ -1,19 +1,21 @@
+from aiogram import F
 from aiogram.types import Message
-from aiogram.filters import Command
 from aiogram.utils.markdown import hlink
 
 from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from config import Bot_username
 from database.methods import get_user_by_tguserid, check_user_in, update_user
 from handlers.init_router import router
+from scripts.loggers import log
 
 from scripts.scripts import Scripts
 
 
-@router.message(Command('бонус'))
-@router.message(Command('bonus'))
+@router.message(F.text.lower().in_(['бонус', 'bonus', '/бонус', '/bonus', f'/bonus@{Bot_username}']))
+@log("Bonus logging, Oh it's a error?")
 async def bonus(message: Message, session: AsyncSession):
     scr = Scripts()
 

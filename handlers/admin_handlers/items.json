@@ -1,7 +1,9 @@
 {
-  "черви": {"type":  "avatar", "path":  "items/chervi.jpg", "buy_price": "None", "sell_price": "None"},
-  "черви донатера": {"type": "avatar", "path": "items/chervi_donater.jpg", "buy_price": "None", "sell_price": 1500000000},
-  "1-й бета тест": {"type": "avatar", "path": "items/chervi_tester.jpg", "buy_price": "None", "sell_price": 10000000000},
+  "черви": {"type":  "avatar", "path":  "items\\chervi.jpg", "buy_price": "None", "sell_price": 1},
+  "черви донатера": {"type": "avatar", "path": "items\\chervi_donater.jpg", "buy_price": "None", "sell_price": 1500000000},
+  "1-й бета тест": {"type": "avatar", "path": "items\\chervi_tester.jpg", "buy_price": "None", "sell_price": 10000000000},
   "Realme Note 60": {"type": "phone", "path": "None", "buy_price": 300000, "sell_price":175000},
-  "Домик админа": {"type": "house", "path": "None", "buy_price": "None", "sell_price": "None"}
+  "Домик админа": {"type": "house", "path": "None", "buy_price": "None", "sell_price": "None"},
+  "НИЧЕГО": {"type": "avatar", "path": "items\\NONE.jpg", "buy_price": "None", "sell_price":  17500000000},
+  "улиточки": {"type": "avatar", "path": "items\\ulitochki.gif", "buy_price": "None", "sell_price": "None"}
 }

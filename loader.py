@@ -13,6 +13,7 @@ from database.session import AsyncSessionLocal
 from handlers.init_router import router
 from console.console import ConsoleManager
 from middleware.database_session import DBSessionMiddleware
+from scripts.media_cache import preload_media_cache
 
 
 # (1, 'суперБабка', 1548320000, 0, '2025-06-28 01:34:14', '1970-01-01 00:00:00', 0, 2, 'None', 'None', 0, 1, 0, 'None', '@FLARMIX', 1438395869)
@@ -29,6 +30,7 @@ async def user_cycle():
 
 
 async def main_run():
+    preload_media_cache()
     await init_db()
 
     logger = logging.getLogger(__name__)

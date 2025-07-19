@@ -1,4 +1,4 @@
-from aiogram import Bot
+from aiogram import Bot, F
 from aiogram.types import Message
 from aiogram.filters import Command
 from aiogram.utils.markdown import hlink
@@ -6,12 +6,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.methods import check_user_in, get_user_by_tguserid, update_user, get_user_stat
 from handlers.init_router import router
+from scripts.loggers import log
 
 from scripts.scripts import Scripts
 
 
-@router.message(Command('slot'))
-@router.message(Command('автомат'))
+@router.message(F.text.lower().startswith(('автомат', 'слоты', 'slot', '/автомат', '/слоты', '/slot')))
+@log("Slot is used - I'm logged!")
 async def slot_machine(message: Message, bot: Bot, session: AsyncSession):
     scr = Scripts()
 
@@ -65,6 +66,10 @@ async def slot_machine(message: Message, bot: Bot, session: AsyncSession):
         if dice_value == 64:
             await update_user(session, 'balance_main', balance_main + int_amount * 35, user_id)
             current_balance = await get_user_stat(session, user_id, 'balance_main')
+
+            current_777_count = user.slot_777_count
+            await update_user(session, 'slot_777_count', current_777_count + 1, user_id)
+
             await message.answer(f'{formated_username}, 777?? Ставка 🤑x35🤑!!! Вы выиграли '
                                  f'{scr.amount_changer(str(int_amount * 35))}$!\n'
                                  f'Ваш баланс: {scr.amount_changer(str(current_balance))}$',

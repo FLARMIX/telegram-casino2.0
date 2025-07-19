@@ -1,21 +1,23 @@
-from io import BytesIO
-
-from PIL import Image
-from aiogram.types import Message, BufferedInputFile
+from aiogram import F
+from aiogram.types import Message
 from aiogram.filters import Command
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from config import ADMIN_IDs
 from database.methods import get_user_by_tguserid, check_user_in, get_user_by_tgusername, get_user_avatar, \
-    get_item_by_name, get_user_items
+    get_item_by_name, get_dict_user_items
 from database.models import ItemType
+
 from handlers.init_router import router
+
+from scripts.loggers import log
+from scripts.media_cache import file_cache_original
 from scripts.scripts import Scripts
+
 from aiogram.utils.markdown import hlink
 
 
-@router.message(Command('инфо'))
-@router.message(Command('info'))
+@router.message(F.text.lower().startswith(('инфо', 'info', '/инфо', '/info')))
+@log("Info command logging...")
 async def info(message: Message, session: AsyncSession):
     scr = Scripts()
     user = await get_user_by_tguserid(session, message.from_user.id)
@@ -50,6 +52,8 @@ async def info(message: Message, session: AsyncSession):
         balance_alt = str(target.balance_alt)
         bonus_count = str(target.bonus_count)
         mini_bonus_count = str(target.mini_bonus_count)
+        roulette_zero_count = str(target.roulette_zero_count)
+        slot_777_count = str(target.slot_777_count)
         rank = str(target.rank)
 
         avatar_item = await get_user_avatar(session, target.tguserid)
@@ -57,7 +61,7 @@ async def info(message: Message, session: AsyncSession):
         avatar_path = str(item_obj.item_path)
 
         # Получаем список предметов
-        items = await get_user_items(session, target.tguserid)
+        items = await get_dict_user_items(session, target.tguserid)
         avatar_items = dict()
         property_items = dict()
 
@@ -73,31 +77,20 @@ async def info(message: Message, session: AsyncSession):
 
         # Формируем текст профиля
         profile_text = (
-            f'🎮 Ваша кликуха: {formated_username}\n'
+            f'🎮 Кликуха: {formated_username}\n'
             f'💰 Баланс: {scr.amount_changer(balance_main)}$\n'
-            f'💰 "Word Of Alternative Balance": {scr.amount_changer(balance_alt)}\n'
+            f'💦 Конча: {scr.amount_changer(balance_alt)}\n'
             f'🎁 Кол-во бонусов: {scr.amount_changer(bonus_count)}\n'
-            f'🤶🏻 Кол-во мини-бонусов: {scr.amount_changer(mini_bonus_count)}\n'
+            f'✨ Кол-во мини-бонусов: {scr.amount_changer(mini_bonus_count)}\n'
+            f'🎯 Кол-во "0" в рулетке: {scr.amount_changer(roulette_zero_count)}\n'
+            f'🎰 Кол-во "777" в слотах: {scr.amount_changer(slot_777_count)}\n'
             f'🖼️ Аватар: {avatar_item}\n'
             f'🎒 Витринные предметы: {", ".join([f"{item} (x{count})" for item, count in avatar_items.items()])}\n'
             f'📦 Имущество: {", ".join([f"{item} (x{count})" for item, count in property_items.items()])}\n'
             f'💻 Ранг: {rank}'
         )
 
-        image = Image.new('RGB', (250, 250), (255, 255, 255))
-
-        item_img = Image.open(avatar_path).resize((250, 250))
-        image.paste(item_img, (0, 0))
-
-        img_byte_arr = BytesIO()
-        image.save(img_byte_arr, format='PNG')
-        img_byte_arr.seek(0)
-
-        # Получаем байты из BytesIO
-        image_bytes = img_byte_arr.getvalue()
-
-        # Создаем BufferedInputFile из байтов
-        input_file = BufferedInputFile(image_bytes, filename="avatars.png")
+        input_file = file_cache_original.get(avatar_path)
 
         # Отправляем фото аватара и текст профиля
         if avatar_path:

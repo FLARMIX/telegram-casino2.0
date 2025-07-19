@@ -5,17 +5,20 @@ import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import ADMIN_IDs
-from database.methods import get_user_by_tguserid, get_user_stat, get_user_items, get_item_by_name, check_user_in, \
+from database.methods import get_user_by_tguserid, get_user_stat, get_dict_user_items, get_item_by_name, check_user_in, \
     update_user
 from database.models import ItemType
 from handlers.init_router import router
+from scripts.loggers import log
 from scripts.scripts import Scripts
 
 logger = logging.getLogger(__name__)
 
 
 @router.inline_query()
-async def inline_roulette(inline_query: InlineQuery, bot: Bot, session: AsyncSession):
+@log("Finding errors in inline roulette :)")
+async def inline_roulette(inline_query: InlineQuery, bot: Bot, **data):
+    session: AsyncSession = data['session']
     scr = Scripts()
 
     user = await get_user_by_tguserid(session, inline_query.from_user.id)
@@ -52,7 +55,7 @@ async def inline_roulette(inline_query: InlineQuery, bot: Bot, session: AsyncSes
             rank = user.rank
 
             # Получаем список предметов (без картинок)
-            items = await get_user_items(session, user_id)
+            items = await get_dict_user_items(session, user_id)
             avatar_items = dict()
             property_items = dict()
 

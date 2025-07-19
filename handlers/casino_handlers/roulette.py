@@ -1,4 +1,4 @@
-from aiogram import Bot
+from aiogram import Bot, F
 from aiogram.types import Message
 from aiogram.filters import Command
 from aiogram.utils.markdown import hlink
@@ -6,12 +6,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.methods import get_user_by_tguserid, get_user_stat, check_user_in, update_user
 from handlers.init_router import router
+from scripts.loggers import log
 
 from scripts.scripts import Scripts
 
 
-@router.message(Command("рулетка"))
-@router.message(Command("roulette"))
+@router.message(F.text.lower().startswith(('рулетка', 'roulette', '/рулетка', '/roulette')))
+@log("If in this roulette has an error, then here is the log UwU")
 async def roulette(message: Message, bot: Bot, session: AsyncSession):
     scr = Scripts()
 
@@ -65,7 +66,6 @@ async def roulette(message: Message, bot: Bot, session: AsyncSession):
         if stack in ['черное', 'чёрное', 'красное', 'чет', 'чёт', 'нечет', 'нечёт']:
             status, number = scr.roulette_randomizer(stack)
             current_stack = scr.pic_color(number)
-            print(status, number, current_stack)
             if status:
                 before_balance = await get_user_stat(session, user_id, "balance_main")
                 await update_user(session, 'balance_main', before_balance + int_amount * 2, user_id)
@@ -86,11 +86,13 @@ async def roulette(message: Message, bot: Bot, session: AsyncSession):
         elif stack in ['зеро']:
             status, number = scr.roulette_randomizer(stack)
             current_stack = scr.pic_color(number)
-            print(status, number, current_stack)
             if status:
                 before_balance = await get_user_stat(session, user_id, "balance_main")
                 await update_user(session, 'balance_main', before_balance + int_amount * 36, user_id)
                 current_balance = await get_user_stat(session, user_id, "balance_main")
+
+                current_zero_count = user.roulette_zero_count
+                await update_user(session, 'roulette_zero_count', current_zero_count + 1, user_id)
 
                 await message.answer(f"{formated_username}, {number} - {current_stack.capitalize()}! Ставка x36🤑!!! "
                                      f"вы выиграли "
@@ -104,6 +106,7 @@ async def roulette(message: Message, bot: Bot, session: AsyncSession):
                                      f"\nБаланс: {scr.amount_changer(str(current_balance))}$",
                                      disable_web_page_preview=True, reply_to_message_id=message.message_id)
         else:
+            await update_user(session, "balance_main", balance_main + int_amount, user_id)
             await message.answer(f"Ошибка! Неправильно указан стек. Вы можете использовать 'черное', "
                                  f"'чёрное', 'красное', 'чет', 'чёт', 'нечет', 'нечёт' или 'зеро'.",
                                  reply_to_message_id=message.message_id)

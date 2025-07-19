@@ -1,17 +1,17 @@
-from aiogram import Bot
+from aiogram import Bot, F
 from aiogram.types import Message
-from aiogram.filters import Command
 from aiogram.utils.markdown import hlink
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.methods import get_user_by_tguserid, check_user_in, get_user_by_tgusername, update_user
 from handlers.init_router import router
+from scripts.loggers import log
 
 from scripts.scripts import Scripts
 
 
-@router.message(Command('передать'))
-@router.message(Command('pay'))
+@router.message(F.text.lower().startswith(('передать', 'pay', '/передать', '/pay')))
+@log("I doubt that there is a mistake here. (pay)")
 async def pay(message: Message, bot: Bot, session: AsyncSession):
     scr = Scripts()
 

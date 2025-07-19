@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 import textwrap
 
@@ -32,20 +33,28 @@ class ConsoleManager:
             "msg": self.message,
             "rank": self.change_rank,
             "admin": self.make_admin,
-            "stop": self.stop_bot,
             "eval": self.cmd_eval
         }
         self.selected_user = None
 
     async def start_console(self):
-        await init_db()
-        print("✅ Консоль запущена. Введите help для списка команд.")
-        while self.running:
+        try:
+            await init_db()
+            print("✅ Консоль запущена. Введите help для списка команд.")
+            while self.running:
+                try:
+                    cmd_line = await self.async_input('> ')
+                    await self.execute_command(cmd_line)
+                except Exception as e:
+                    print(f"❌ Ошибка: {e}")
+
+        except KeyboardInterrupt as e:
             try:
-                cmd_line = await self.async_input('> ')
-                await self.execute_command(cmd_line)
-            except Exception as e:
-                print(f"❌ Ошибка: {e}")
+                logging.debug(f'{e}')
+                logging.info('Bot stopped by KeyboardInterrupt')
+                await exit('Stopping...')
+            except SystemExit:
+                pass
 
     async def async_input(self, prompt: str = '') -> str:
         loop = asyncio.get_running_loop()
@@ -79,7 +88,8 @@ class ConsoleManager:
               "  info <username>      - информация о пользователе\n"
               "  msg <msg>            - отправить сообщение выбранному пользователю\n"
               "  rank <rank>          - изменить ранг выбранному пользователю\n"
-              "  eval <command>       - выполнить код"
+              "  eval <command>       - выполнить код\n"
+              "  admin <username>     - сделать пользователя Модератором"
               "")
 
     async def cmd_exit(self, args):
@@ -223,10 +233,6 @@ class ConsoleManager:
         await change_rank(self.db_session, self.selected_user.tguserid, "Модератор")
         print(f"✅ Пользователь {self.selected_user.tgusername} назначен модератором")
         await self.bot.send_message(self.selected_user.tguserid, f"✅ Вы назначены модератором")
-
-    async def stop_bot(self, args):
-        self.logger.info("Stoping server...")
-        exit('Console stoping server...')
 
     async def cmd_eval(self, args):
         code_str = " ".join(args)

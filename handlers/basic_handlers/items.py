@@ -1,11 +1,13 @@
+import logging
+
 from aiogram.types import Message
-from aiogram.filters import Command
 from aiogram.types import BufferedInputFile
 from aiogram import F
 from aiogram.types import CallbackQuery
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database.methods import get_user_by_tguserid, get_user_items, get_item_by_name
+from config import Bot_username
+from database.methods import get_user_by_tguserid, get_dict_user_items, get_item_by_name
 from handlers.init_router import router
 
 from database.models import ItemType
@@ -15,14 +17,21 @@ from PIL import Image, ImageDraw, ImageFont
 
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
+from scripts.loggers import log
+from scripts.media_cache import image_cache_resized_500
 
-@router.message(Command("предметы"))
-@router.message(Command("items"))
+logger = logging.getLogger(__name__)
+
+
+@router.message(F.text.lower().in_(["предметы", "items", '/преметы', '/items', f'/items@{Bot_username}']))
+@log("I searching errors in items!")
 async def show_items_menu(message: Message):
     # Создаем клавиатуру с кнопками
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Аватарки", callback_data="items_avatar")],
-        [InlineKeyboardButton(text="Имущество", callback_data="items_property")],
+        [
+            InlineKeyboardButton(text="Аватарки", callback_data="items_avatar"),
+            InlineKeyboardButton(text="Имущество", callback_data="items_property")
+         ],
         [InlineKeyboardButton(text="Все предметы", callback_data="items_all")]
     ])
 
@@ -38,7 +47,7 @@ async def show_avatar_items(callback: CallbackQuery, session: AsyncSession):
     user = await get_user_by_tguserid(session, callback.from_user.id)
 
     # Получаем предметы с типом "avatar"
-    items = await get_user_items(session, user.tguserid)
+    items = await get_dict_user_items(session, user.tguserid)
 
     avatar_items = dict()
     for item, count in items.items():
@@ -52,10 +61,11 @@ async def show_avatar_items(callback: CallbackQuery, session: AsyncSession):
 
     # Создание объединенного изображения для аватарок
     all_paths = []
+    all_names = []
     for item, count in avatar_items.items():  # Итерируем по словарю
         item_path = await get_item_by_name(session, item)
         if item_path and item_path.item_path:
-            all_paths.append((item_path.item_path, count))  # Сохраняем путь и количество
+            all_paths.append((item_path.item_path, count, item))  # Сохраняем путь и количество
 
     if not all_paths:
         await callback.message.answer("Нет доступных изображений для ваших аватарок.",
@@ -84,15 +94,16 @@ async def show_avatar_items(callback: CallbackQuery, session: AsyncSession):
 
     # Наложение изображений
     x_offset, y_offset = 0, 0
-    for idx, (path, count) in enumerate(all_paths):
+    for idx, (path, count, item_name) in enumerate(all_paths):
         try:
-            item_img = Image.open(path).resize((image_width, image_height))
+            item_img = image_cache_resized_500.get(path)
             combined_image.paste(item_img, (x_offset, y_offset))
 
             # Добавляем текст с количеством аватарок
             draw = ImageDraw.Draw(combined_image)
-            font = ImageFont.load_default(size=30)
-            draw.text((x_offset + 20, y_offset + 20), f"x{count}", fill="white", font=font)
+            font_path = "scripts/Roboto.ttf"
+            font = ImageFont.truetype(font=font_path, size=30)
+            draw.text((x_offset + 20, y_offset + 20), f"x{count} {item_name}", fill="white", font=font)
 
             # Обновляем координаты для следующей аватарки
             x_offset += image_width
@@ -102,7 +113,7 @@ async def show_avatar_items(callback: CallbackQuery, session: AsyncSession):
                 x_offset = 0
                 y_offset += image_height
         except Exception as e:
-            print(f"Ошибка загрузки {path}: {e}")
+            logger.info(f"Ошибка загрузки {path}: {e}")
 
     # Конвертация в bytes
     img_byte_arr = BytesIO()
@@ -128,7 +139,7 @@ async def show_property_items(callback: CallbackQuery, session: AsyncSession):
     user_id = callback.from_user.id
 
     # Получаем предметы с типом, отличным от "avatar"
-    items = await get_user_items(session, user_id)
+    items = await get_dict_user_items(session, user_id)
 
     property_items = dict()
     for item, count in items.items():
@@ -150,7 +161,7 @@ async def show_all_items(callback: CallbackQuery, session: AsyncSession):
     user_id = callback.from_user.id
 
     # Получаем все предметы пользователя
-    items = await get_user_items(session, user_id)
+    items = await get_dict_user_items(session, user_id)
 
     if not items:
         await callback.message.answer("У вас нет ни одного предмета.", reply_to_message_id=callback.message.message_id)

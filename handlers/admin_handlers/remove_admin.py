@@ -4,7 +4,7 @@ from aiogram.utils.markdown import hlink
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import ADMIN_IDs
-from database.methods import get_user_by_tguserid, get_user_by_tgusername, remove_admin
+from database.methods import get_user_by_tguserid, get_user_by_tgusername, remove_admin, update_user
 from handlers.init_router import router
 
 
@@ -28,6 +28,7 @@ async def pay(message: Message, session: AsyncSession):
         formated_username = hlink(f'{username}', f'https://t.me/{tg_username}')
 
         await remove_admin(session, target.tguserid)
+        await update_user(session, 'rank', 'Игрок', target.tguserid)
         await message.answer(f'{formated_username} теперь НЕ админ!',
                              reply_to_message_id=message.message_id)
 
