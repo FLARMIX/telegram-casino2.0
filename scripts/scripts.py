@@ -1,12 +1,15 @@
 from json import load
 from random import randint as ri
+from random import choices as cho
 from random import choice
 from aiogram import Bot
 import os
 
+from aiogram.types import Message
 from sqlalchemy.orm import Mapped
 
 from config import CHANNEL_ID
+from database.SQLmodels import User
 
 
 class Scripts:
@@ -18,6 +21,17 @@ class Scripts:
 
         self.admin_name = "@FLARMIX"
         self.channel_name = "@PidorsCasino"
+
+        self.reds = [num for num, color in self.number_color.items() if color == 'красное']
+        self.blacks = [num for num, color in self.number_color.items() if color == 'черное']
+
+        self.population = self.reds + self.blacks + ["0"]
+
+        red_weights = 49.5 / len(self.reds) # ~2.75%
+        black_weights = 49.5 / len(self.blacks) # ~2.75%
+        zero_weight = 1.0
+        self.weights = [red_weights] * len(self.reds) + [black_weights] * len(self.blacks) + [zero_weight]
+
 
     async def check_channel_subscription(self, bot: Bot, user_id: int | Mapped[int]) -> bool:
         """
@@ -36,7 +50,7 @@ class Scripts:
             print(f"Ошибка при проверке подписки: {e}")
             return False
 
-    async def check_registered(self, user, message): # TODO: Заменить все проверки этой функцией
+    async def check_registered(self, user: User, message: Message): # TODO: Заменить все проверки этой функцией
         if not user:
             await message.answer('Вы не зарегистрированы, пожалуйста, зарегистрируйтесь с помощью /register',
                                  reply_to_message_id=message.message_id)
@@ -62,7 +76,8 @@ class Scripts:
 
         return formated_number
 
-    def amount_changer(self, string: str) -> str:
+    def amount_changer(self, string: str | int | float | Mapped[int]) -> str:
+        string = str(string)
         k_counter = 0
         for i in string:
             if i == 'к' or i == 'k':
@@ -76,7 +91,7 @@ class Scripts:
         return self.format_number(int(result))
 
     def random_number(self) -> str:
-        return str(ri(0, 36))
+        return cho(self.population, weights=self.weights, k=1)[0]
 
     def pic_color(self, number: str) -> str:
         if number in self.number_color:

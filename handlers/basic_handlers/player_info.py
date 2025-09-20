@@ -3,8 +3,9 @@ from aiogram.types import Message
 from aiogram.filters import Command
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from database.SQLmodels import Rank
 from database.methods import get_user_by_tguserid, check_user_in, get_user_by_tgusername, get_user_avatar, \
-    get_item_by_name, get_dict_user_items
+    get_item_by_name, get_dict_user_items, get_user_rank
 from database.models import ItemType
 
 from handlers.init_router import router
@@ -54,7 +55,12 @@ async def info(message: Message, session: AsyncSession):
         mini_bonus_count = str(target.mini_bonus_count)
         roulette_zero_count = str(target.roulette_zero_count)
         slot_777_count = str(target.slot_777_count)
-        rank = str(target.rank)
+        rank = await get_user_rank(session, target.tguserid)
+
+        if isinstance(rank, Rank):
+            rank_name = rank.rank_name
+        else:
+            rank_name = rank
 
         avatar_item = await get_user_avatar(session, target.tguserid)
         item_obj = await get_item_by_name(session, avatar_item)
@@ -87,7 +93,7 @@ async def info(message: Message, session: AsyncSession):
             f'🖼️ Аватар: {avatar_item}\n'
             f'🎒 Витринные предметы: {", ".join([f"{item} (x{count})" for item, count in avatar_items.items()])}\n'
             f'📦 Имущество: {", ".join([f"{item} (x{count})" for item, count in property_items.items()])}\n'
-            f'💻 Ранг: {rank}'
+            f'💻 Ранг: {rank_name}'
         )
 
         input_file = file_cache_original.get(avatar_path)

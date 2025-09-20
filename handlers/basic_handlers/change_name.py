@@ -1,3 +1,5 @@
+import re
+
 from aiogram import Bot, F
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
@@ -9,7 +11,7 @@ from handlers.init_router import router
 from scripts.loggers import log
 
 
-@router.message(F.text.lower().startswith(('ник', 'nick', '/ник', '/nick')))
+@router.message(F.text.regexp(r'^/?(ник|nick)(\s|$)', flags=re.IGNORECASE))
 @log("Logging nickname command.")
 async def nickname(message: Message, state: FSMContext, session: AsyncSession):
     user = await get_user_by_tguserid(session, message.from_user.id)

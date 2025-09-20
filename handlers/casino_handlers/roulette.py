@@ -1,9 +1,11 @@
+import re
+
 from aiogram import Bot, F
 from aiogram.types import Message
-from aiogram.filters import Command
 from aiogram.utils.markdown import hlink
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from config import Bot_username
 from database.methods import get_user_by_tguserid, get_user_stat, check_user_in, update_user
 from handlers.init_router import router
 from scripts.loggers import log
@@ -11,12 +13,27 @@ from scripts.loggers import log
 from scripts.scripts import Scripts
 
 
-@router.message(F.text.lower().startswith(('рулетка', 'roulette', '/рулетка', '/roulette')))
+STACKS = r"(?:красное|черное|чёрное|зеро|чет|чёт|нечет|нечёт)"
+AMOUNT = r"(?P<amount>(?:вс[её])|\d+(?:[.,]\d+)?[кk]*)"  # 200, 200к/200k, 2m, "все/всё"
+
+ROULETTE_RE = re.compile(
+    rf"^/?(?:рулетка|рул|roulette|rul|roulette@{re.escape(Bot_username)}|rul@{re.escape(Bot_username)})\s+"
+    rf"(?P<stack>{STACKS})(?:\s+{AMOUNT})?\s*$",
+    re.IGNORECASE,
+)
+
+
+@router.message(F.text.regexp(ROULETTE_RE).as_("m"))
 @log("If in this roulette has an error, then here is the log UwU")
-async def roulette(message: Message, bot: Bot, session: AsyncSession):
+async def roulette(message: Message, bot: Bot, session: AsyncSession, m: re.Match):
     scr = Scripts()
 
-    command, stack, amount = message.text.lower().split()
+    stack = m.group("stack").lower()
+    amount = m.group("amount")
+
+    if amount is None:
+        await message.answer("Укажите сумму ставки!", reply_to_message_id=message.message_id)
+
     user = await get_user_by_tguserid(session, message.from_user.id)
     user_id = user.tguserid
 
@@ -88,15 +105,15 @@ async def roulette(message: Message, bot: Bot, session: AsyncSession):
             current_stack = scr.pic_color(number)
             if status:
                 before_balance = await get_user_stat(session, user_id, "balance_main")
-                await update_user(session, 'balance_main', before_balance + int_amount * 36, user_id)
+                await update_user(session, 'balance_main', before_balance + int_amount * 42, user_id)
                 current_balance = await get_user_stat(session, user_id, "balance_main")
 
                 current_zero_count = user.roulette_zero_count
                 await update_user(session, 'roulette_zero_count', current_zero_count + 1, user_id)
 
-                await message.answer(f"{formated_username}, {number} - {current_stack.capitalize()}! Ставка x36🤑!!! "
+                await message.answer(f"{formated_username}, {number} - {current_stack.capitalize()}! Ставка x42🤑!!! "
                                      f"вы выиграли "
-                                     f"{scr.amount_changer(str(int_amount * 36))}$"
+                                     f"{scr.amount_changer(str(int_amount * 42))}$"
                                      f"\nБаланс: {scr.amount_changer(str(current_balance))}$",
                                      disable_web_page_preview=True, reply_to_message_id=message.message_id)
             else:
@@ -110,3 +127,11 @@ async def roulette(message: Message, bot: Bot, session: AsyncSession):
             await message.answer(f"Ошибка! Неправильно указан стек. Вы можете использовать 'черное', "
                                  f"'чёрное', 'красное', 'чет', 'чёт', 'нечет', 'нечёт' или 'зеро'.",
                                  reply_to_message_id=message.message_id)
+
+
+@router.message(F.text.regexp(f"^/?(рулетка|рул|roulette|rul|roulette@{Bot_username})(?:\s|$)", flags=re.IGNORECASE))
+@log("If in this roulette has an error, then here is the log UwU")
+async def roulette_no_stack(message: Message):
+    await message.answer("Неверный формат команды. Пример:\n\n/rul красное 101\nрулетка чёт 200к\nрул зеро все\n\n"
+                         "Все текущие стеки: 'черное', 'чёрное', 'красное', 'чет', 'чёт', 'нечет', 'нечёт' или 'зеро'.")
+

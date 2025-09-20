@@ -7,7 +7,7 @@ from prompt_toolkit import PromptSession
 from prompt_toolkit.history import FileHistory
 
 from database.methods import init_db, get_all_users, get_user_by_tgusername, update_user, make_admin, change_rank, \
-    delete_user, get_user_by_tguserid
+    delete_user, get_user_by_tguserid, change_rank_console
 from database.SQLmodels import User
 from database.session import AsyncSessionLocal
 from scripts.scripts import Scripts
@@ -25,6 +25,7 @@ class ConsoleManager:
             "exit": self.cmd_exit,
             "help": self.cmd_help,
             "select": self.cmd_select,
+            "set": self.cmd_set,
             "give": self.cmd_give,
             "bc": self.cmd_broadcast,
             "ban": self.delete_user,
@@ -81,7 +82,8 @@ class ConsoleManager:
               "  help                 - показать список команд\n"
               "  exit                 - выйти\n"
               "  select <username>    - выбрать пользователя\n"
-              "  give <amount>        - выдать токены выбранному пользователю\n"
+              "  set <amount>         - сетнуть деньги выбранному пользователю\n"
+              "  give <amount>        - выдать деньги выбранному пользователю\n"
               "  bc <msg>             - отправить сообщение всем пользователям\n"
               "  ban                  - заблокировать пользователя\n"
               "  clear                - очистить консоль\n"
@@ -117,6 +119,36 @@ class ConsoleManager:
             print(f"✅ Пользователь {target_username} выбран")
         else:
             print("❌ Пользователь не найден")
+
+    async def cmd_set(self, args):
+        if self.selected_user is None:
+            print("❌ Пользователь не выбран. Используй select <id>")
+            return
+        if not args:
+            print("❌ Укажите сумму")
+            return
+
+        amount = int(args[0])
+
+        if isinstance(self.selected_user, list):
+            for user in self.selected_user:
+                await update_user(
+                    self.db_session,
+                    "balance_main",
+                    amount,
+                    user.tguserid
+                )
+                print(f"💰 Сетнуто {amount}$ пользователю {user.tgusername}")
+                await self.bot.send_message(user.tguserid, f"💰 Сетнуто {self.scr.amount_changer(str(amount))}$ [CONSOLE COMMAND]")
+        else:
+            await update_user(
+                self.db_session,
+                "balance_main",
+                amount,
+                self.selected_user.tguserid
+            )
+            print(f"💰 Сетнуто {amount}$ пользователю {self.selected_user.tgusername}")
+            await self.bot.send_message(self.selected_user.tguserid, f"💰 Сетнуто {self.scr.amount_changer(str(amount))}$ [CONSOLE COMMAND]")
 
     async def cmd_give(self, args):
         if self.selected_user is None:
@@ -183,7 +215,7 @@ class ConsoleManager:
             print("❌ Операция отменена")
 
     async def cmd_clear(self, args):
-        os.system('cls')
+        os.system('clear')
 
     async def user_info(self, args):
         if self.selected_user is None:
@@ -220,7 +252,7 @@ class ConsoleManager:
 
         new_rank = ' '.join(args)
 
-        await change_rank(self.db_session, self.selected_user.tguserid, new_rank)
+        await change_rank_console(self.db_session, new_rank, self.selected_user.tguserid)
         print(f"✅ Установлен ранг {new_rank} для пользователя {self.selected_user.tgusername}")
         await self.bot.send_message(self.selected_user.tguserid, f"✅ Установлен ранг {new_rank}")
 

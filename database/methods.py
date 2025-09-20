@@ -7,7 +7,7 @@ from sqlalchemy import select, ChunkedIteratorResult, update, delete
 from sqlalchemy.orm import Mapped
 
 from config import ADMIN_IDs
-from .SQLmodels import Base, Slavery, User, UserItems, Item, Trade
+from .SQLmodels import Base, Slavery, User, UserItems, Item, Trade, Rank, Dice
 from database.session import engine, AsyncSessionLocal
 
 
@@ -148,6 +148,23 @@ async def create_trade(
     return trade
 
 
+async def create_dice_game(
+                        session: AsyncSessionLocal,
+                        first_user_id: int | Mapped[int],
+                        second_user_id: int | Mapped[int],
+                        bet_amount: int | Mapped[int]
+                    ) -> Dice:
+    dice = Dice(
+        first_user_id=first_user_id,
+        second_user_id=second_user_id,
+        bet_amount=bet_amount
+    )
+
+    session.add(dice)
+    await session.commit()
+    return dice
+
+
 async def get_item_by_name(session: AsyncSessionLocal, item_name: str) -> Optional[Item]:
     stmt = select(Item).where(Item.item_name == item_name)
     result: ChunkedIteratorResult[Item] = await session.execute(stmt)
@@ -182,6 +199,84 @@ async def get_trade_by_trade_id(session: AsyncSessionLocal, trade_id: int | Mapp
     return result
 
 
+async def get_dice_game_by_id(session: AsyncSessionLocal, dice_id: int | Mapped[int]) -> Optional[Dice]:
+    stmt = select(Dice).where(Dice.id == dice_id)
+    pre_result: ChunkedIteratorResult[Dice] = await session.execute(stmt)
+    result: Dice = pre_result.scalar_one_or_none()
+    return result
+
+
+async def add_rank_to_user(session: AsyncSessionLocal, rank: str, tguserid: int | Mapped[int]) -> bool:
+    user_ranks = await get_user_ranks_string_list(session, tguserid)
+    rank = await get_rank_by_name(session, rank)
+    rank_id = str(rank.id)
+
+    if rank_id not in user_ranks:
+        new_ranks = ','.join(user_ranks + [rank_id + ','])
+        stmt = update(UserItems).where(UserItems.tguserid == tguserid).values(ranks_list=new_ranks)
+        await session.execute(stmt)
+        await session.commit()
+        return True
+
+    else:
+        print('000')
+        return False
+
+
+async def get_user_ranks(session: AsyncSessionLocal, tguserid: int | Mapped[int]) -> List[Rank] | None:
+    stmt = select(UserItems.ranks_list).where(UserItems.tguserid == tguserid)
+    pre_result: ChunkedIteratorResult[UserItems] = await session.execute(stmt)
+    result = pre_result.scalar_one_or_none()
+    if result:
+        temp_list = []
+        for rank in result.split(",")[:-1]:
+            rank_object = await get_rank_by_id(session, int(rank))
+            temp_list.append(rank_object)
+        return temp_list
+
+    return []
+
+
+async def get_user_ranks_string_list(session: AsyncSessionLocal, tguserid: int | Mapped[int]) -> List[str] | None:
+    stmt = select(UserItems.ranks_list).where(UserItems.tguserid == tguserid)
+    pre_result: ChunkedIteratorResult[UserItems] = await session.execute(stmt)
+    result = pre_result.scalar_one_or_none()
+    if result:
+        temp_list = []
+        for rank in result.split(",")[:-1]:
+            rank_object = await get_rank_by_id(session, int(rank))
+            temp_list.append(str(rank_object.id))
+        return temp_list
+
+    return []
+
+
+async def get_user_rank(session: AsyncSessionLocal, tguserid: int | Mapped[int]) -> Rank:
+    stmt = select(UserItems.current_rank).where(UserItems.tguserid == tguserid)
+    pre_result: ChunkedIteratorResult[UserItems] = await session.execute(stmt)
+    result: str = pre_result.scalars().first()
+
+    if result.isdigit():
+        rank = await get_rank_by_id(session, int(result))
+    else:
+        rank = result
+
+    return rank
+
+
+async def get_rank_by_id(session: AsyncSessionLocal, rank_id: int | Mapped[int]) -> Optional[Rank]:
+    stmt = select(Rank).where(Rank.id == rank_id)
+    pre_result: ChunkedIteratorResult[Rank] = await session.execute(stmt)
+    result: Rank = pre_result.scalar_one_or_none()
+    return result
+
+async def get_rank_by_name(session: AsyncSessionLocal, rank_name: str | Mapped[str]) -> Optional[Rank]:
+    stmt = select(Rank).where(Rank.rank_name == rank_name)
+    pre_result: ChunkedIteratorResult[Rank] = await session.execute(stmt)
+    result: Rank = pre_result.scalar_one_or_none()
+    return result
+
+
 async def register_user(session: AsyncSessionLocal, username: str, tguserid: int) -> bool:
     tgusername = '@' + username
     if await get_user_by_tguserid(session, tguserid) is not None:
@@ -194,7 +289,7 @@ async def register_user(session: AsyncSessionLocal, username: str, tguserid: int
 
     user = User(
         # Main Stats
-        rank="Игрок",
+        # rank="Игрок",
         username=username,
         balance_main=25_000,
         balance_alt=0,
@@ -216,6 +311,9 @@ async def register_user(session: AsyncSessionLocal, username: str, tguserid: int
         cur_trade_id=-1,
         is_in_trade=False,
 
+        # Dices
+        cur_dice_game_id=-1,
+
         # For the future
         is_worker=False,
         work_name="",
@@ -228,6 +326,10 @@ async def register_user(session: AsyncSessionLocal, username: str, tguserid: int
     user_items = UserItems(
         items_list="{}",
         avatar_item="черви",
+
+        ranks_list="1,",
+        current_rank="1",
+
         tguserid=tguserid,
     )
 
@@ -241,17 +343,19 @@ async def register_user(session: AsyncSessionLocal, username: str, tguserid: int
         tguserid=tguserid,
     )
 
-    if str(tguserid) in ADMIN_IDs:
-        user.is_admin = True
-        if str(tguserid) == ADMIN_IDs[0]:
-            user.rank = "Владелец"
-        else:
-            user.rank = "Администратор"
-
-
     session.add(user)
     session.add(user_items)
     session.add(user_slavery)
+
+    if str(tguserid) in ADMIN_IDs:
+        user.is_admin = True
+        if str(tguserid) == ADMIN_IDs[0]:
+            await add_rank_to_user(session, "Владелец", tguserid)
+            user_items.current_rank = '2'
+        else:
+            await add_rank_to_user(session, "Администратор", tguserid)
+            user_items.current_rank = '3'
+
 
     await session.commit()
     return True
@@ -276,10 +380,6 @@ async def update_username(session: AsyncSessionLocal, username: str, tguserid: i
     await update_user(session, "username", username, tguserid)
 
 
-async def change_rank(session: AsyncSessionLocal, tguserid: int, rank: str) -> None:
-    await update_user(session, "rank", rank, tguserid)
-
-
 async def update_bonus(session: AsyncSessionLocal, tguserid: int, current_time: datetime) -> None:
     user = await get_user_by_id(session, tguserid)
     await update_user(session, "bonus_count", user.bonus_count + 1, tguserid)
@@ -300,8 +400,44 @@ async def add_item(session: AsyncSessionLocal, item_name: str, item_type: str, p
     await session.commit()
 
 
+async def add_rank(session: AsyncSessionLocal, rank_name: str, rank_buy_price: int, rank_sell_price: int) -> None:
+    rank = Rank(
+        rank_name=rank_name,
+        rank_buy_price=rank_buy_price,
+        rank_sell_price=rank_sell_price
+    )
+
+    session.add(rank)
+    await session.commit()
+
+
+async def change_rank_console(session: AsyncSessionLocal, rank: str, tguserid: int | Mapped[int]) -> None:
+    stmt = select(UserItems).where(UserItems.tguserid == tguserid)
+    pre_result: ChunkedIteratorResult[UserItems] = await session.execute(stmt)
+    result: UserItems = pre_result.scalar_one_or_none()
+
+    result.current_rank = rank
+    await session.commit()
+
+
+async def change_rank(session: AsyncSessionLocal, rank: Rank, tguserid: int | Mapped[int]) -> None:
+    stmt = select(UserItems).where(UserItems.tguserid == tguserid)
+    pre_result: ChunkedIteratorResult[UserItems] = await session.execute(stmt)
+    result: UserItems = pre_result.scalar_one_or_none()
+
+    result.current_rank = str(rank.id)
+    await session.commit()
+
+
 async def get_existing_items_names(session: AsyncSessionLocal) -> list:
     stmt = select(Item.item_name)
+    result: ChunkedIteratorResult[Item] = await session.execute(stmt)
+    items = [item for item in result.scalars().all()]
+    return items
+
+
+async def get_items_by_names(session: AsyncSessionLocal, item_names: list[str]) -> list[Item]:
+    stmt = select(Item).where(Item.item_name.in_(item_names))
     result: ChunkedIteratorResult[Item] = await session.execute(stmt)
     items = [item for item in result.scalars().all()]
     return items
@@ -332,11 +468,20 @@ async def remove_item_from_user(session: AsyncSessionLocal, item_id: int | Mappe
         raise ValueError(f'Item {item.id} does not exist in the database')
 
     user_items = await get_dict_user_items(session, tguserid)
+    item_name = item.item_name
 
-    if item.item_name in user_items:
-        user_items[item.item_name] -= count
+    if item_name in user_items:
+        # Проверяем, хватает ли предметов для удаления
+        if user_items[item_name] >= count:
+            user_items[item_name] -= count
+            # Если количество стало 0, удаляем предмет из словаря
+            if user_items[item_name] == 0:
+                del user_items[item_name]
+        else:
+            logger.info(f'У пользователя {tguserid} недостаточно предметов "{item_name}"')
+            return False
     else:
-        logger.info(f'User {tguserid} does not have item {item.item_name}')
+        logger.info(f'У пользователя {tguserid} нет предмета "{item_name}"')
         return False
 
     stmt = update(UserItems).where(UserItems.tguserid == tguserid).values(items_list=json.dumps(user_items))
@@ -357,6 +502,21 @@ async def update_items(session: AsyncSessionLocal, json_data: dict) -> None:
             path=item_data.get('path'),
             item_buy_price=item_data.get('buy_price'),
             item_sell_price=item_data.get('sell_price')
+        )
+
+    await session.commit()
+
+async def update_ranks(session: AsyncSessionLocal, json_data: dict) -> None:
+    stmt = delete(Rank)
+    await session.execute(stmt)
+    await session.commit()
+
+    for rank_name, rank_data in json_data.items():
+        await add_rank(
+            session=session,
+            rank_name=rank_name,
+            rank_buy_price=rank_data['buy_price'],
+            rank_sell_price=rank_data.get('sell_price')
         )
 
     await session.commit()
@@ -392,6 +552,28 @@ async def check_user_in(session: AsyncSessionLocal, tguserid: int | Mapped[int])
     stmt = select(User).where(User.tguserid == tguserid)
     result: ChunkedIteratorResult[User] = await session.execute(stmt)
     return result.scalar_one_or_none() is not None
+
+
+async def update_dice_game(session: AsyncSessionLocal, stat_name: str, value: Any, dice_id: int | Mapped[int]):
+    stmt = select(Dice).where(Dice.id == dice_id)
+    result: ChunkedIteratorResult[Dice] = await session.execute(stmt)
+    dice = result.scalar_one_or_none()
+
+    try:
+        if stat_name not in dice.__dict__.keys():
+            raise ValueError(f"{stat_name} is not a valid stat name")
+        else:
+            setattr(dice, stat_name, value)
+            await session.commit()
+    except ValueError as e:
+        print(f'Ошибка: {e}\n\nПроблема: {stat_name}')
+        return
+
+
+async def delete_dice_game(session: AsyncSessionLocal, dice_id: int | Mapped[int]):
+    stmt = delete(Dice).where(Dice.id == dice_id)
+    await session.execute(stmt)
+    await session.commit()
 
 
 async def update_trade(session: AsyncSessionLocal, stat_name: str, value: Any, trade_id: int | Mapped[int]) -> None:

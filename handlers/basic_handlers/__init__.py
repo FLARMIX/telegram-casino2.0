@@ -10,3 +10,6 @@ from . import slavery
 from . import trade
 from . import sell_item
 from . import change_avatar
+from . import change_rank
+from . import help
+

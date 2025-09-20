@@ -4,7 +4,7 @@ import os
 extensions = {'.py'}
 
 # Папки, которые игнорируем
-ignored_dirs = {'OLD_VERSION', '.git', 'node_modules', '__pycache__', '.venv', 'venv', '.idea', '.vscode', 'build', 'dist', '.mypy_cache'}
+ignored_dirs = {'test_functions', 'OLD_VERSION', '.git', 'node_modules', '__pycache__', '.venv', 'venv', '.idea', '.vscode', 'build', 'dist', '.mypy_cache'}
 
 # Путь к корню проекта
 project_path = '.'

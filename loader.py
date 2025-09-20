@@ -1,4 +1,5 @@
 import logging
+from json import loads
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
@@ -8,7 +9,7 @@ import asyncio
 from database.SQLmodels import User
 
 import config
-from database.methods import init_db
+from database.methods import init_db, update_items, update_ranks
 from database.session import AsyncSessionLocal
 from handlers.init_router import router
 from console.console import ConsoleManager
@@ -40,11 +41,20 @@ async def main_run():
 
     dp.message.middleware(DBSessionMiddleware())
     dp.callback_query.middleware(DBSessionMiddleware())
+    dp.update.middleware(DBSessionMiddleware())
 
     dp["bot"] = bot
     dp["logger"] = logger
 
     session = AsyncSessionLocal()
+
+    with open('handlers/admin_handlers/items.json', 'r', encoding='utf-8') as json_data:
+        data = loads(json_data.read())
+        await update_items(session, data)
+
+    with open('handlers/admin_handlers/ranks.json', 'r', encoding='utf-8') as json_data:
+        data = loads(json_data.read())
+        await update_ranks(session, data)
 
     console = ConsoleManager(session, logger, bot)
     asyncio.create_task(console.start_console())

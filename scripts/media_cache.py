@@ -3,7 +3,7 @@ from PIL import Image
 from aiogram.types import BufferedInputFile
 from io import BytesIO
 
-MEDIA_FOLDER = "items"
+MEDIA_FOLDER = "media"
 
 # Кэши
 image_cache_original: dict[str, Image.Image] = {}
@@ -13,7 +13,7 @@ file_cache_resized_500: dict[str, BufferedInputFile] = {}
 
 def preload_media_cache():
     """
-    Предзагружает все картинки/видео из папки items в кэш:
+    Предзагружает все картинки/видео из папки media в кэш:
     - Оригинальные изображения -> image_cache_original
     - Сжатые до 500x500 -> image_cache_resized_500
     - BufferedInputFile (из оригинала) -> file_cache_original
@@ -36,6 +36,7 @@ def preload_media_cache():
 
                 # Кэшируем оригинал как BufferedInputFile
                 file_cache_original[path] = BufferedInputFile(raw_bytes, filename=file)
+                print(path)
 
                 if ext in {".jpg", ".jpeg", ".png"}:
                     img = Image.open(BytesIO(raw_bytes)).convert("RGB")

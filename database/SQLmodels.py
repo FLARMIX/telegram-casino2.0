@@ -15,7 +15,7 @@ class User(Base):
 
     # Main stats
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    rank: Mapped[str] = mapped_column(String)                       # Player rank (Moder, Admin, Player)
+    # rank: Mapped[str] = mapped_column(String)                       # Player rank (Moder, Admin, Player)
     username: Mapped[str] = mapped_column(String)                   # User's nickname
     balance_main: Mapped[int] = mapped_column(Integer)              # User's balance in $
     balance_alt: Mapped[int] = mapped_column(Integer)               # User's alternative balance
@@ -34,8 +34,11 @@ class User(Base):
     is_immune: Mapped[bool] = mapped_column(Boolean)                # User's immunity (Slavery)
 
     # Trades
-    cur_trade_id: Mapped[int] = mapped_column(Integer)
-    is_in_trade: Mapped[bool] = mapped_column(Boolean)
+    cur_trade_id: Mapped[int] = mapped_column(Integer)              # Trade id (Trades)
+    is_in_trade: Mapped[bool] = mapped_column(Boolean)              # User's trade (Trades)
+
+    # Dices
+    cur_dice_game_id: Mapped[int] = mapped_column(Integer)          # Dice game id (Dices)
 
     # For the future
     work_name: Mapped[str] = mapped_column(String)
@@ -57,14 +60,27 @@ class Item(Base):
     item_sell_price: Mapped[int] = mapped_column(Integer)
 
 
+class Rank(Base):
+    __tablename__ = "Ranks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    rank_name: Mapped[str] = mapped_column(String)
+    rank_buy_price: Mapped[int] = mapped_column(Integer)
+    rank_sell_price: Mapped[int] = mapped_column(Integer)
+
+
 class UserItems(Base):
     __tablename__ = "UserItems"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    # Base items
     items_list: Mapped[str] = mapped_column(String)
     avatar_item: Mapped[str] = mapped_column(String)
 
     # TODO: Сделать инвентарь рангов!
+    # User ranks
+    ranks_list: Mapped[str] = mapped_column(String)
+    current_rank: Mapped[str] = mapped_column(String)
 
     tguserid: Mapped[int] = mapped_column(Integer)
 
@@ -107,3 +123,13 @@ class Trade(Base):
 
     first_user_message_id: Mapped[int] = mapped_column(Integer)
     second_user_message_id: Mapped[int] = mapped_column(Integer)
+
+
+class Dice(Base):
+    __tablename__ = "Dices"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    first_user_id: Mapped[int] = mapped_column(Integer)
+    second_user_id: Mapped[int] = mapped_column(Integer)
+
+    bet_amount: Mapped[int] = mapped_column(Integer)

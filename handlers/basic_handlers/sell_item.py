@@ -81,7 +81,7 @@ async def sell_item(message: Message, state: FSMContext, session: AsyncSession) 
     if message_len == 1:
         keyboard = create_pagination_keyboard(user_items_list)
         user_message = await message.answer('Выберите предмет для продажи:', reply_markup=keyboard)
-        await state.update_data(user_message=user_message, user_id=user.tguserid)
+        await state.update_data(user_message=user_message, user_id=user.tguserid, message_with_keyboard=user_message)
         return
 
     try:
@@ -173,7 +173,6 @@ async def confirm_sell_item(callback: CallbackQuery, state: FSMContext, bot: Bot
     chat_id = callback.message.chat.id
 
     data = await state.get_data()
-
     user_balance = user.balance_main
     scr = Scripts()
 
@@ -184,13 +183,61 @@ async def confirm_sell_item(callback: CallbackQuery, state: FSMContext, bot: Bot
     item_id = int(callback.data.split("_")[2])
     item = await get_item_by_id(session, item_id)
 
-    item_price = item.item_sell_price
+    # Получаем словарь предметов пользователя, чтобы узнать количество
+    user_items_dict = await get_dict_user_items(session, user.tguserid)
+    item_name = item.item_name
+    count = user_items_dict.get(item_name, 0)  # Продаем все доступные предметы
 
-    flag = await remove_item_from_user(session, item_id, user.tguserid)
-    if not flag:
-        await callback.answer("У вас нет этого предмета")
+    if count == 0:
+        await callback.answer("У вас нет этого предмета!", show_alert=True)
         return
 
-    await update_user(session, "balance_main", user_balance + item_price, user.tguserid)
+    # Удаляем предметы
+    flag = await remove_item_from_user(session, item_id, user.tguserid)
+    if not flag:
+        await callback.answer("Ошибка при продаже предмета!", show_alert=True)
+        return
 
-    await bot.send_message(chat_id, f'Вы продали предмет "{item.item_name}" за {scr.amount_changer(str(item_price))}$')
+    # Обновляем баланс
+    total_price = item.item_sell_price
+    await update_user(session, "balance_main", user_balance + total_price, user.tguserid)
+
+    # Обновляем клавиатуру
+    user_items = await get_user_items(session, user.tguserid)
+    keyboard = create_pagination_keyboard(user_items)
+    user_message = data["message_with_keyboard"]
+
+    try:
+        await bot.edit_message_reply_markup(
+            chat_id=chat_id,
+            message_id=user_message.message_id,
+            reply_markup=keyboard
+        )
+    except:
+        # Если сообщение не удается отредактировать, отправляем новое
+        await bot.delete_message(chat_id, user_message.message_id)
+        user_message = await bot.send_message(chat_id, 'Выберите предмет для продажи:', reply_markup=keyboard)
+        await state.update_data(message_with_keyboard=user_message)
+
+    # Отправляем подтверждение продажи
+    await bot.send_message(
+        chat_id,
+        f'Вы продали "{item.item_name}" за {scr.amount_changer(str(total_price))}$'
+    )
+    await callback.answer()
+
+@router.callback_query(PaginationCallback.filter(F.action.in_(["sell_command_next", "sell_command_previous"])))
+async def handle_sell_command_pagination(callback: CallbackQuery, state: FSMContext, callback_data: PaginationCallback, session: AsyncSession) -> None:
+    user = await get_user_by_tguserid(session, callback.from_user.id)
+    data = await state.get_data()
+    page = callback_data.page
+
+    if 'user_id' not in data or data['user_id'] != user.tguserid:
+        await callback.answer("Это не ваша кнопка!", show_alert=True)
+        return
+
+    user_items_list = await get_user_items(session, user.tguserid)
+    keyboard = create_pagination_keyboard(user_items_list, page)
+
+    await callback.message.edit_reply_markup(reply_markup=keyboard)
+    await callback.answer()

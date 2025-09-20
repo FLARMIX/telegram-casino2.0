@@ -4,3 +4,4 @@ from . import add_item
 from . import admin_menu
 from . import make_admin
 from . import remove_admin
+from . import update_ranks
