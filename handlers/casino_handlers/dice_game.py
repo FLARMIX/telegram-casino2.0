@@ -103,7 +103,7 @@ async def dice_game(message: Message, state: FSMContext, bot: Bot, session: Asyn
         ]
     )
 
-    bones_image = file_cache_original.get("media/assets/dice_img.jpg")
+    bones_image = file_cache_original.get("media\\assets\\dice_img.jpg")
 
     formated_amount = scr.amount_changer(str(int_amount))
     text = f"{hlink(str(user.username), f'tg://user?id={user.tgusername}')}, хочет сыграть в кости! Ставка — {formated_amount}$.\n"

@@ -1,0 +1,23 @@
+{
+  "Игрок": {"buy_price": "None", "sell_price": "None"},
+  "Владелец": {"buy_price": "None", "sell_price": "None"},
+  "Администратор": {"buy_price": "None", "sell_price": "None"},
+  "Модератор": {"buy_price": "None", "sell_price": "None"},
+  "Повелитель спермы": {"buy_price": 600, "sell_price": "None"},
+  "Злодей Бо Синн": {"buy_price": 300, "sell_price": "None"},
+  "Хранитель Семени": {"buy_price": 1500, "sell_price": "None"},
+  "Соплежуй": {"buy_price": 500, "sell_price": "None"},
+  "Архидрочер": {"buy_price": 700, "sell_price": "None"},
+  "Дилдоносец": {"buy_price": 200, "sell_price": "None"},
+  "Инкубатор Фекально-Эякуляторных Реакций": {"buy_price": 4500, "sell_price": "None"},
+  "Мастер Лудоанального Спермогенеза": {"buy_price": 3500, "sell_price": "None"},
+  "Калогенератор": {"buy_price": 200, "sell_price": "None"},
+  "Спермогенератор": {"buy_price": 300, "sell_price": "None"},
+  "Калопроповедник": {"buy_price": 800, "sell_price": "None"},
+  "Крипто-калобарон": {"buy_price": 1000, "sell_price": "None"},
+  "Покоритель Говноэнтропийного Всплеска": {"buy_price": 2500, "sell_price": "None"},
+  "\uD83D\uDD73\uFE0F Первородный Эякуляр \uD83D\uDD73\uFE0F": {"buy_price": 8000, "sell_price": "None"},
+  "⚛\uFE0F Ω-Спермагеддон ⚛\uFE0F": {"buy_price": 15000, "sell_price": "None"},
+  "\uD83D\uDCAB ĈopřoSperm PrıMordialıs \uD83D\uDCAB": {"buy_price": 20000, "sell_price": "None"},
+  "\uD83C\uDF0A Prøto-SpeřmoZøıd \uD83D\uDCA6": {"buy_price": 30000, "sell_price": "None"}
+}
