@@ -1,5 +1,5 @@
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy import Integer, String, DateTime, Boolean, ForeignKey, Enum
+from sqlalchemy import Integer, String, DateTime, Boolean, ForeignKey, Enum, ARRAY
 
 from database.models import TradeStatus
 
@@ -39,6 +39,10 @@ class User(Base):
 
     # Dices
     cur_dice_game_id: Mapped[int] = mapped_column(Integer)          # Dice game id (Dices)
+
+    # Blackjack
+    cur_blackjack_game_id: Mapped[int] = mapped_column(Integer)
+    is_in_blackjack: Mapped[bool] = mapped_column(Boolean)
 
     # For the future
     work_name: Mapped[str] = mapped_column(String)
@@ -133,3 +137,32 @@ class Dice(Base):
     second_user_id: Mapped[int] = mapped_column(Integer)
 
     bet_amount: Mapped[int] = mapped_column(Integer)
+
+
+class BlackjackGame(Base):
+    __tablename__ = "BlackjackGames"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+
+    first_user_id: Mapped[int] = mapped_column(Integer)
+    second_user_id: Mapped[int] = mapped_column(Integer)
+
+    bet_amount: Mapped[int] = mapped_column(Integer)
+
+    bank: Mapped[int] = mapped_column(Integer)
+
+    last_action_first_user: Mapped[str] = mapped_column(DateTime)
+    last_action_second_user: Mapped[str] = mapped_column(DateTime)
+
+    first_user_cards: Mapped[list[str]] = mapped_column(String)
+    second_user_cards: Mapped[list[str]] = mapped_column(String)
+
+    first_user_cards_sum: Mapped[int] = mapped_column(Integer)
+    second_user_cards_sum: Mapped[int] = mapped_column(Integer)
+
+    deck: Mapped[list[str]] = mapped_column(String)
+
+    current_turn_user_id: Mapped[int] = mapped_column(Integer)
+
+    first_user_message_id: Mapped[int] = mapped_column(Integer)
+    second_user_message_id: Mapped[int] = mapped_column(Integer)

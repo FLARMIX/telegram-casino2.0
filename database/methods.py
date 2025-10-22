@@ -7,7 +7,7 @@ from sqlalchemy import select, ChunkedIteratorResult, update, delete
 from sqlalchemy.orm import Mapped
 
 from config import ADMIN_IDs
-from .SQLmodels import Base, Slavery, User, UserItems, Item, Trade, Rank, Dice
+from .SQLmodels import Base, Slavery, User, UserItems, Item, Trade, Rank, Dice, BlackjackGame
 from database.session import engine, AsyncSessionLocal
 
 
@@ -165,6 +165,56 @@ async def create_dice_game(
     return dice
 
 
+async def create_blackjack_game(
+        session: AsyncSessionLocal,
+        first_user_id: int | Mapped[int],
+        second_user_id: int | Mapped[int],
+        bet_amount: int | Mapped[int],
+        current_turn_user_id: int | Mapped[int],
+
+        deck: list[str] | Mapped[list[str]] = None,
+
+        first_user_cards: list[str] | Mapped[list[str]] = list,
+        second_user_cards: list[str] | Mapped[list[str]] = list,
+
+        first_user_cards_sum: int | Mapped[int] = 0,
+        second_user_cards_sum: int | Mapped[int] = 0,
+
+        first_user_message_id: int | Mapped[int] = -1,
+        second_user_message_id: int | Mapped[int] = -1,
+
+        ) -> BlackjackGame:
+    date = datetime.strptime(datetime.now().strftime('%Y-%m-%d %H:%M:%S'), '%Y-%m-%d %H:%M:%S')
+    date = date - timedelta(days=1)
+    date = date.strftime('%Y-%m-%d %H:%M:%S')
+    date = datetime.strptime(date, '%Y-%m-%d %H:%M:%S')
+
+    blackjack_game = BlackjackGame(
+        first_user_id=first_user_id,
+        second_user_id=second_user_id,
+        bet_amount=bet_amount,
+        current_turn_user_id=current_turn_user_id,
+
+        deck=deck,
+
+        first_user_cards=first_user_cards,
+        second_user_cards=second_user_cards,
+
+        first_user_cards_sum=first_user_cards_sum,
+        second_user_cards_sum=second_user_cards_sum,
+
+        first_user_message_id=first_user_message_id,
+        second_user_message_id=second_user_message_id,
+
+        last_action_first_user=date,
+        last_action_second_user=date
+    )
+    session.add(blackjack_game)
+    await session.commit()
+    return blackjack_game
+
+
+
 async def get_item_by_name(session: AsyncSessionLocal, item_name: str) -> Optional[Item]:
     stmt = select(Item).where(Item.item_name == item_name)
     result: ChunkedIteratorResult[Item] = await session.execute(stmt)
@@ -313,6 +363,10 @@ async def register_user(session: AsyncSessionLocal, username: str, tguserid: int
 
         # Dices
         cur_dice_game_id=-1,
+
+        # Blackjack
+        cur_blackjack_game_id=-1,
+        is_in_blackjack=False,
 
         # For the future
         is_worker=False,
@@ -591,8 +645,29 @@ async def update_trade(session: AsyncSessionLocal, stat_name: str, value: Any, t
         return
 
 
+async def update_blackjack_game(session: AsyncSessionLocal, stat_name: str, value: Any, game_id: int | Mapped[int]) -> None:
+    stmt = select(BlackjackGame).where(BlackjackGame.id == game_id)
+    result: ChunkedIteratorResult[BlackjackGame] = await session.execute(stmt)
+    blackjack_game = result.scalar_one_or_none()
+    try:
+        if stat_name not in blackjack_game.__dict__.keys():
+            raise ValueError(f"{stat_name} is not a valid stat name")
+        else:
+            setattr(blackjack_game, stat_name, value)
+            await session.commit()
+    except ValueError as e:
+        print(f'Ошибка: {e}\n\nПроблема: {stat_name}')
+        return
+
+
 async def delete_trade(session: AsyncSessionLocal, trade_id: int | Mapped[int]) -> None:
     stmt = delete(Trade).where(Trade.id == trade_id)
+    await session.execute(stmt)
+    await session.commit()
+
+
+async def delete_blackjack_game(session: AsyncSessionLocal, game_id: int | Mapped[int]) -> None:
+    stmt = delete(BlackjackGame).where(BlackjackGame.id == game_id)
     await session.execute(stmt)
     await session.commit()
 

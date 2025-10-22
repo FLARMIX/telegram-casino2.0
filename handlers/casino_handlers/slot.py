@@ -29,8 +29,8 @@ async def slot_machine(message: Message, bot: Bot, session: AsyncSession, state:
         amount = message_text[1]
 
     if not user_channel_status:
-        await message.answer('Вы не подписаны на канал, подпишитесь на мой канал @PidorsCasino'
-                             '\nЧтобы получить доступ к боту, вам необходимо подписаться на мой канал.',
+        await message.answer('Вы не подписаны на канал, подпишитесь на канал @PidorsCasino'
+                             '\nЧтобы получить доступ к боту, вам необходимо подписаться.',
                              reply_to_message_id=message.message_id)
         return
 

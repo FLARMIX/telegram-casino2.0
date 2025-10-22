@@ -51,9 +51,9 @@ async def roulette(message: Message, bot: Bot, session: AsyncSession, m: re.Matc
 
     user_channel_status = await scr.check_channel_subscription(bot, user_id)
 
-    if not user_channel_status:
-        await message.answer('Вы не подписаны на канал, подпишитесь на мой канал @PidorsCasino'
-                             '\nЧтобы получить доступ к боту, вам необходимо подписаться на мой канал.',
+    if not await scr.check_channel_subscription(bot, user.tguserid):
+        await message.answer('Вы не подписаны на канал, подпишитесь на канал @PidorsCasino'
+                             '\nЧтобы получить доступ к боту, вам необходимо подписаться.',
                              reply_to_message_id=message.message_id)
         return
 
@@ -61,72 +61,71 @@ async def roulette(message: Message, bot: Bot, session: AsyncSession, m: re.Matc
         await message.answer("Вы не зарегистрированы, пожалуйста, зарегистрируйтесь с помощью /register",
                              reply_to_message_id=message.message_id)
         return
-    else:
 
-        if amount in ['все', 'всё']:
-            amount = str(balance_main)
+    if amount in ['все', 'всё']:
+        amount = str(balance_main)
 
-        int_amount = scr.unformat_number(scr.amount_changer(amount))
+    int_amount = scr.unformat_number(scr.amount_changer(amount))
 
-        if int_amount <= 0:
-            await message.answer("Сумма ставки должна быть больше 0!",
-                                 reply_to_message_id=message.message_id)
-            return
+    if int_amount <= 0:
+        await message.answer("Сумма ставки должна быть больше 0!",
+                             reply_to_message_id=message.message_id)
+        return
 
-        if balance_main < int_amount:
-            await message.answer(f"У вас недостаточно средств!\nВаш баланс {scr.amount_changer(str(balance_main))}",
-                                 reply_to_message_id=message.message_id)
-            return
+    if balance_main < int_amount:
+        await message.answer(f"У вас недостаточно средств!\nВаш баланс {scr.amount_changer(str(balance_main))}",
+                             reply_to_message_id=message.message_id)
+        return
 
-        await update_user(session, "balance_main", balance_main - int_amount, user_id)
+    await update_user(session, "balance_main", balance_main - int_amount, user_id)
 
-        if stack in ['черное', 'чёрное', 'красное', 'чет', 'чёт', 'нечет', 'нечёт']:
-            status, number = scr.roulette_randomizer(stack)
-            current_stack = scr.pic_color(number)
-            if status:
-                before_balance = await get_user_stat(session, user_id, "balance_main")
-                await update_user(session, 'balance_main', before_balance + int_amount * 2, user_id)
-                current_balance = await get_user_stat(session, user_id, "balance_main")
+    if stack in ['черное', 'чёрное', 'красное', 'чет', 'чёт', 'нечет', 'нечёт']:
+        status, number = scr.roulette_randomizer(stack)
+        current_stack = scr.pic_color(number)
+        if status:
+            before_balance = await get_user_stat(session, user_id, "balance_main")
+            await update_user(session, 'balance_main', before_balance + int_amount * 2, user_id)
+            current_balance = await get_user_stat(session, user_id, "balance_main")
 
-                await message.answer(f"{formated_username}, {number} - {current_stack.capitalize()}! Ставка x2 "
-                                     f"{scr.randomize_emoji(win=True)}, вы выиграли "
-                                     f"{scr.amount_changer(str(int_amount * 2))}$"
-                                     f"\nБаланс: {scr.amount_changer(str(current_balance))}$",
-                                     disable_web_page_preview=True, reply_to_message_id=message.message_id)
-                await update_user(session, "balance_main", balance_main + int_amount, user_id)
-            else:
-                current_balance = await get_user_stat(session, user_id, 'balance_main')
-                await message.answer(f"{formated_username}, {number} - {current_stack.capitalize()}! Вы проиграли "
-                                     f"{scr.amount_changer(str(int_amount))}$ {scr.randomize_emoji(win=False) * 2}"
-                                     f"\nБаланс: {scr.amount_changer(str(current_balance))}$",
-                                     disable_web_page_preview=True, reply_to_message_id=message.message_id)
-        elif stack in ['зеро']:
-            status, number = scr.roulette_randomizer(stack)
-            current_stack = scr.pic_color(number)
-            if status:
-                before_balance = await get_user_stat(session, user_id, "balance_main")
-                await update_user(session, 'balance_main', before_balance + int_amount * 42, user_id)
-                current_balance = await get_user_stat(session, user_id, "balance_main")
-
-                current_zero_count = user.roulette_zero_count
-                await update_user(session, 'roulette_zero_count', current_zero_count + 1, user_id)
-
-                await message.answer(f"{formated_username}, {number} - {current_stack.capitalize()}! Ставка x42🤑!!! "
-                                     f"вы выиграли "
-                                     f"{scr.amount_changer(str(int_amount * 42))}$"
-                                     f"\nБаланс: {scr.amount_changer(str(current_balance))}$",
-                                     disable_web_page_preview=True, reply_to_message_id=message.message_id)
-            else:
-                current_balance = await get_user_stat(session, user_id, 'balance_main')
-                await message.answer(f"{formated_username}, {number} - {current_stack.capitalize()}! Вы проиграли "
-                                     f"{scr.amount_changer(str(int_amount))}$ {scr.randomize_emoji(win=False) * 2}"
-                                     f"\nБаланс: {scr.amount_changer(str(current_balance))}$",
-                                     disable_web_page_preview=True, reply_to_message_id=message.message_id)
-        else:
+            await message.answer(f"{formated_username}, {number} - {current_stack.capitalize()}! Ставка x2 "
+                                 f"{scr.randomize_emoji(win=True)}, вы выиграли "
+                                 f"{scr.amount_changer(str(int_amount * 2))}$"
+                                 f"\nБаланс: {scr.amount_changer(str(current_balance))}$",
+                                 disable_web_page_preview=True, reply_to_message_id=message.message_id)
             await update_user(session, "balance_main", balance_main + int_amount, user_id)
-            await message.answer(f"Ошибка! Неправильно указан стек. Вы можете использовать 'черное', "
-                                 f"'чёрное', 'красное', 'чет', 'чёт', 'нечет', 'нечёт' или 'зеро'.",
-                                 reply_to_message_id=message.message_id)
+        else:
+            current_balance = await get_user_stat(session, user_id, 'balance_main')
+            await message.answer(f"{formated_username}, {number} - {current_stack.capitalize()}! Вы проиграли "
+                                 f"{scr.amount_changer(str(int_amount))}$ {scr.randomize_emoji(win=False) * 2}"
+                                 f"\nБаланс: {scr.amount_changer(str(current_balance))}$",
+                                 disable_web_page_preview=True, reply_to_message_id=message.message_id)
+    elif stack in ['зеро']:
+        status, number = scr.roulette_randomizer(stack)
+        current_stack = scr.pic_color(number)
+        if status:
+            before_balance = await get_user_stat(session, user_id, "balance_main")
+            await update_user(session, 'balance_main', before_balance + int_amount * 42, user_id)
+            current_balance = await get_user_stat(session, user_id, "balance_main")
+
+            current_zero_count = user.roulette_zero_count
+            await update_user(session, 'roulette_zero_count', current_zero_count + 1, user_id)
+
+            await message.answer(f"{formated_username}, {number} - {current_stack.capitalize()}! Ставка x42🤑!!! "
+                                 f"вы выиграли "
+                                 f"{scr.amount_changer(str(int_amount * 42))}$"
+                                 f"\nБаланс: {scr.amount_changer(str(current_balance))}$",
+                                 disable_web_page_preview=True, reply_to_message_id=message.message_id)
+        else:
+            current_balance = await get_user_stat(session, user_id, 'balance_main')
+            await message.answer(f"{formated_username}, {number} - {current_stack.capitalize()}! Вы проиграли "
+                                 f"{scr.amount_changer(str(int_amount))}$ {scr.randomize_emoji(win=False) * 2}"
+                                 f"\nБаланс: {scr.amount_changer(str(current_balance))}$",
+                                 disable_web_page_preview=True, reply_to_message_id=message.message_id)
+    else:
+        await update_user(session, "balance_main", balance_main + int_amount, user_id)
+        await message.answer(f"Ошибка! Неправильно указан стек. Вы можете использовать 'черное', "
+                             f"'чёрное', 'красное', 'чет', 'чёт', 'нечет', 'нечёт' или 'зеро'.",
+                             reply_to_message_id=message.message_id)
 
 
 @router.message(F.text.regexp(f"^/?(рулетка|рул|roulette|rul|roulette@{Bot_username})(?:\s|$)", flags=re.IGNORECASE))

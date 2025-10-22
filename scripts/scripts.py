@@ -58,6 +58,13 @@ class Scripts:
         return True
 
 
+    def generate_deck(self) -> list:
+        with open('scripts/cards_for_deck.json', 'r', encoding='utf-8') as json_file:
+            deck = load(json_file)
+
+        return deck.shuffle()
+
+
     def randomize_emoji(self, win: bool) -> str:
         if win:
             return choice('🥵😝😎🏆🔥')

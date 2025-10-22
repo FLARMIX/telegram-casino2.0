@@ -1,4 +1,3 @@
-# TODO: Кости как в ББ, крадём их :)
 import asyncio
 import re
 
