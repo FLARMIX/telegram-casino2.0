@@ -1,3 +1,5 @@
+import os
+
 from aiogram.types import Message
 from aiogram.filters import Command
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,8 +20,10 @@ async def update_items_cmd(message: Message, session: AsyncSession):
     user_rank = await get_user_rank(session, user.tguserid)
 
     if str(user.tguserid) in ADMIN_IDs and user.is_admin:
-        with open("handlers/admin_handlers/items.json", 'r', encoding='utf-8') as json_data:
+        items_file_path = os.path.join("handlers", "admin_handlers", "items.json")
+        with open(items_file_path, 'r', encoding='utf-8') as json_data:
             data = loads(json_data.read())
+            print(data)
         await update_items(session, data)
         await message.answer("Updating items...")
     elif user.is_admin:

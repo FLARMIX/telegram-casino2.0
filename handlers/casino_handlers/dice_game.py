@@ -1,5 +1,6 @@
 import asyncio
 import re
+import os
 
 from aiogram import Bot, F
 from aiogram.fsm.context import FSMContext
@@ -102,7 +103,9 @@ async def dice_game(message: Message, state: FSMContext, bot: Bot, session: Asyn
         ]
     )
 
-    bones_image = file_cache_original.get("media\\assets\\dice_img.jpg")
+    # Using os.path.join for cross-platform compatibility
+    bones_image_path = os.path.join("media", "assets", "dice_img.jpg")
+    bones_image = file_cache_original.get(bones_image_path)
 
     formated_amount = scr.amount_changer(str(int_amount))
     text = f"{hlink(str(user.username), f'tg://user?id={user.tgusername}')}, хочет сыграть в кости! Ставка — {formated_amount}$.\n"

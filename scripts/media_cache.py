@@ -25,6 +25,8 @@ def preload_media_cache():
         print(files)
         for file in files:
             path = os.path.join(root, file)
+            # Normalize path for cross-platform compatibility
+            normalized_path = os.path.normpath(path)
             ext = os.path.splitext(file)[1].lower()
 
             if ext not in supported_ext:
@@ -35,18 +37,18 @@ def preload_media_cache():
                     raw_bytes = f.read()
 
                 # Кэшируем оригинал как BufferedInputFile
-                file_cache_original[path] = BufferedInputFile(raw_bytes, filename=file)
+                file_cache_original[normalized_path] = BufferedInputFile(raw_bytes, filename=file)
                 print(path)
 
                 if ext in {".jpg", ".jpeg", ".png"}:
                     img = Image.open(BytesIO(raw_bytes)).convert("RGB")
-                    image_cache_original[path] = img
+                    image_cache_original[normalized_path] = img
                     resized_image = img.resize((500, 500))
-                    image_cache_resized_500[path] = resized_image
+                    image_cache_resized_500[normalized_path] = resized_image
 
                     bio = BytesIO()
                     resized_image.save(bio, format="PNG")
-                    file_cache_resized_500[path] = BufferedInputFile(bio.getvalue(), filename=file)
+                    file_cache_resized_500[normalized_path] = BufferedInputFile(bio.getvalue(), filename=file)
 
 
                 print(image_cache_original)

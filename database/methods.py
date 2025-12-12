@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 from datetime import datetime, timedelta
 from typing import Any, Optional, Sequence, List
 
@@ -549,11 +550,13 @@ async def update_items(session: AsyncSessionLocal, json_data: dict) -> None:
     await session.commit()
 
     for item_name, item_data in json_data.items():
+        path = os.path.join(*item_data.get('path').split('/'))
+        print(path)
         await add_item(
             session=session,
             item_name=item_name,
             item_type=item_data['type'],
-            path=item_data.get('path'),
+            path=path,
             item_buy_price=item_data.get('buy_price'),
             item_sell_price=item_data.get('sell_price')
         )
