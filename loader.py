@@ -48,7 +48,7 @@ async def main_run():
 
     session = AsyncSessionLocal()
 
-    with open('handlers/admin_handlers/items_old.json', 'r', encoding='utf-8') as json_data:
+    with open('handlers/admin_handlers/items.json', 'r', encoding='utf-8') as json_data:
         data = loads(json_data.read())
         await update_items(session, data)
 
