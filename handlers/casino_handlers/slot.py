@@ -119,7 +119,6 @@ async def slot_machine(message: Message, bot: Bot, session: AsyncSession, state:
 
 @router.callback_query(F.data == "repeat_slot_bet")
 async def repeat_slot_bet(callback: CallbackQuery, session: AsyncSession, state: FSMContext):
-    await asyncio.sleep(0.6)
 
     user_id = callback.from_user.id
     user = await get_user_by_tguserid(session, user_id)
@@ -162,6 +161,7 @@ async def repeat_slot_bet(callback: CallbackQuery, session: AsyncSession, state:
 
         current_777_count = user.slot_777_count
         await update_user(session, 'slot_777_count', current_777_count + 1, user_id)
+        await asyncio.sleep(0.6)
 
         await callback.message.answer(f'{formated_username}, 777?? Ставка 🤑x30🤑!!! Вы выиграли '
                              f'{scr.amount_changer(str(int_amount * 30))}$!\n'
@@ -171,6 +171,8 @@ async def repeat_slot_bet(callback: CallbackQuery, session: AsyncSession, state:
     elif dice_value == 43:
         await update_user(session, 'balance_main', balance_main + int_amount * 15, user_id)
         current_balance = await get_user_stat(session, user_id, 'balance_main')
+        await asyncio.sleep(0.6)
+
         await callback.message.answer(f'{formated_username}, Ставка x15🤑! Вы выиграли '
                              f'{scr.amount_changer(str(int_amount * 15))}$!\n'
                              f'Ваш баланс: {scr.amount_changer(str(current_balance))}$',
@@ -179,6 +181,8 @@ async def repeat_slot_bet(callback: CallbackQuery, session: AsyncSession, state:
     elif dice_value == 22:
         await update_user(session, 'balance_main', balance_main + int_amount * 10, user_id)
         current_balance = await get_user_stat(session, user_id, 'balance_main')
+        await asyncio.sleep(0.6)
+
         await callback.message.answer(f'{formated_username}, Ставка x10! Вы выиграли '
                              f'{scr.amount_changer(str(int_amount * 10))}$!\n'
                              f'Ваш баланс: {scr.amount_changer(str(current_balance))}$',
@@ -187,6 +191,8 @@ async def repeat_slot_bet(callback: CallbackQuery, session: AsyncSession, state:
     elif dice_value == 1:
         await update_user(session, 'balance_main', balance_main + int_amount * 5, user_id)
         current_balance = await get_user_stat(session, user_id, 'balance_main')
+        await asyncio.sleep(0.6)
+
         await callback.message.answer(f'{formated_username}, Ставка x5. Вы выиграли '
                              f'{scr.amount_changer(str(int_amount * 5))}$!\n'
                              f'Ваш баланс: {scr.amount_changer(str(current_balance))}$',
@@ -194,6 +200,8 @@ async def repeat_slot_bet(callback: CallbackQuery, session: AsyncSession, state:
                              reply_markup=keyboard)
     else:
         current_balance = await get_user_stat(session, user_id, 'balance_main')
+        await asyncio.sleep(0.6)
+
         await callback.message.answer(f'{formated_username}, Вы проиграли '
                              f'{scr.amount_changer(str(int_amount))}$!\n'
                              f'Ваш баланс: {scr.amount_changer(str(current_balance))}$',
