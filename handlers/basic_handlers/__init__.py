@@ -12,4 +12,5 @@ from . import sell_item
 from . import change_avatar
 from . import change_rank
 from . import help
+from . import top_balance
 
