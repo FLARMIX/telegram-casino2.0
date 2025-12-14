@@ -40,4 +40,4 @@ async def top_balance(message: Message, bot: Bot, session: AsyncSession) -> None
         
         rating_text += f"{position}{username} - {balance}$\n"
     
-    await bot.send_message(user_id, rating_text, parse_mode=None)
+    await message.answer(rating_text, parse_mode="HTML", disable_web_page_preview=True)
