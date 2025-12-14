@@ -1,3 +1,4 @@
+import asyncio
 import re
 
 from aiogram import Bot, F
@@ -118,6 +119,7 @@ async def slot_machine(message: Message, bot: Bot, session: AsyncSession, state:
 
 @router.callback_query(F.data == "repeat_slot_bet")
 async def repeat_slot_bet(callback: CallbackQuery, session: AsyncSession, state: FSMContext):
+    await asyncio.sleep(0.6)
 
     user_id = callback.from_user.id
     user = await get_user_by_tguserid(session, user_id)
