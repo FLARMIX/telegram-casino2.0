@@ -44,8 +44,8 @@ async def bonus(message: Message, session: AsyncSession):
         # Преобразуем строку в объект datetime
         last_bonus_time = datetime.strptime(last_bonus_time_str, '%Y-%m-%d %H:%M:%S')
         time_diff = datetime.now() - last_bonus_time
-        if time_diff.total_seconds() < 60: # Basic 1800 seconds
-            next_bonus = 60 - time_diff.total_seconds()
+        if time_diff.total_seconds() < 1800: # Basic 1800 seconds
+            next_bonus = 1800 - time_diff.total_seconds()
             await message.answer(
                 f"{formated_username}, следующий бонус через {int(next_bonus)} сек.!",
                 disable_web_page_preview=True,
