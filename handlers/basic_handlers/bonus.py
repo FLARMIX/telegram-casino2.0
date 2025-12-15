@@ -53,7 +53,7 @@ async def bonus(message: Message, session: AsyncSession):
             )
             return
 
-    BONUS_AMOUNT = 500_000_000
+    BONUS_AMOUNT = 200_000
 
     new_time = datetime.strptime(datetime.now().strftime('%Y-%m-%d %H:%M:%S'), '%Y-%m-%d %H:%M:%S')
 
