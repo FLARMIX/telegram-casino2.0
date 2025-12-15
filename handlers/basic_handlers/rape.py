@@ -26,15 +26,15 @@ async def rape_command(message: Message, session: AsyncSession):
                              reply_to_message_id=message.message_id)
         return
 
-    # Check cooldown (5 minutes)
+    # Check cooldown (2 minutes)
     last_mini_bonus_time_str = str(user.last_mini_bonus_time)
     
     if last_mini_bonus_time_str:
         last_mini_bonus_time = datetime.strptime(last_mini_bonus_time_str, '%Y-%m-%d %H:%M:%S')
         time_diff = datetime.now() - last_mini_bonus_time
         
-        if time_diff.total_seconds() < 300:  # 5 minutes cooldown
-            next_bonus = 300 - time_diff.total_seconds()
+        if time_diff.total_seconds() < 120:  # 2 minutes cooldown
+            next_bonus = 120 - time_diff.total_seconds()
             await message.answer(
                 f"Следующее изнасилование будет доступно через {int(next_bonus)} секунд!",
                 reply_to_message_id=message.message_id
