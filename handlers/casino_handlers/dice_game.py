@@ -99,7 +99,7 @@ async def dice_game(message: Message, state: FSMContext, bot: Bot, session: Asyn
 
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="✅ Принять", callback_data=f"accept_dice_game:{dice_game.id}")],
-            [InlineKeyboardButton(text="❌ Отменить", callback_data="cancel_dice_game")]
+            [InlineKeyboardButton(text="❌ Отменить", callback_data=f"cancel_dice_game:{dice_game.id}")]
         ]
     )
 
@@ -125,13 +125,22 @@ async def dice_game(message: Message, state: FSMContext, bot: Bot, session: Asyn
                             text=text, dice_game=dice_game)
 
 
-@router.callback_query(F.data == "cancel_dice_game")
+@router.callback_query(F.data.startswith("cancel_dice_game"))
 async def cancel_dice_game(callback: CallbackQuery, state: FSMContext, bot: Bot, session: AsyncSession) -> None:
+    # Extract dice game ID from callback data
+    data_parts = callback.data.split(":")
+    if len(data_parts) == 2:
+        dice_game_id = int(data_parts[1])
+        # Get the dice game to check who created it
+        dice_game = await get_dice_game_by_id(session, dice_game_id)
+        if dice_game and dice_game.first_user_id != callback.from_user.id:
+            await callback.answer("Отменить игру может только создатель!", show_alert=True)
+            return
+    
     user = await get_user_by_tguserid(session, callback.from_user.id)
     ok = await cancel_dice_game_logic(user, state, bot, session, user_message=callback.message)
     if not ok:
         await callback.answer("Отменить игру может только создатель!", show_alert=True)
-
 
 
 @router.callback_query(F.data.startswith("accept_dice_game"))
