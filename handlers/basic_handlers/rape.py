@@ -14,7 +14,7 @@ from scripts.loggers import log
 from scripts.scripts import Scripts
 
 
-@router.message(F.text.regexp(rf'^(\/)?(изнасиловать|rape)(@{Bot_username})?(\s+.*)?$', flags=re.IGNORECASE))
+@router.message(F.text.regexp(rf'^/?(изнасиловать|rape)(@{Bot_username})?(\s+.*)?$', flags=re.IGNORECASE))
 @log("Rape command used")
 async def rape_command(message: Message, session: AsyncSession):
     scr = Scripts()

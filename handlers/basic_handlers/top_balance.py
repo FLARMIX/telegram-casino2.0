@@ -6,13 +6,14 @@ from aiogram.utils.markdown import hlink
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from config import Bot_username
 from database.SQLmodels import User
 from handlers.init_router import router
 from scripts.loggers import log
 from scripts.scripts import Scripts
 
 
-@router.message(F.text.regexp(r'^/?топ|top$', flags=re.IGNORECASE))
+@router.message(F.text.regexp(rf'^/?(топ|top|top@{Bot_username})$', flags=re.IGNORECASE))
 @log('Top balance command')
 async def top_balance(message: Message, bot: Bot, session: AsyncSession) -> None:
     user_id = message.from_user.id
